@@ -17,23 +17,107 @@
     p {
       font-size: 13px;
       color: #555;
-      margin: 0;
+      margin: 0 0 12px 0;
       line-height: 1.4;
     }
-    .badge {
-      display: inline-block;
-      background: #4CAF50;
-      color: white;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
+    .footer {
       margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      text-align: left;
+    }
+    .options {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .label {
+      flex: 1;
+      color: #333;
+    }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      border-radius: 999px;
+      background: #ccc;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+    .toggle-handle {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 2px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
+    }
+    .toggle.on {
+      background: #4CAF50;
+    }
+    .toggle.on .toggle-handle {
+      transform: translateX(20px);
     }
   </style>
 </head>
 <body>
-  <h1>Fpaste by Spoorthy</h1>
-  <p>Paste and copy are allowed on this site. Use Ctrl+V (or Cmd+V) to paste anywhere, even when the site tries to block it.</p>
-  <span class="badge">Active</span>
+  <h1>myPC myWIsh</h1>
+  <p>
+    by
+    <a href="https://yagati.com/vasavya" target="_blank" rel="noopener noreferrer">
+      Vasavya Yagati
+    </a>
+  </p>
+  <p>Choose what myPC myWIsh should force on this page.</p>
+
+  <div class="options">
+    <div class="row">
+      <span class="label">Copy</span>
+      <div id="toggleCopy" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Paste</span>
+      <div id="togglePaste" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Selection</span>
+      <div id="toggleSelection" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Right click</span>
+      <div id="toggleRightClick" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Show password on double-click</span>
+      <div id="togglePwd" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+  </div>
+
+  <p class="footer">
+    <a href="https://github.com/Spoorthy-Innovations/myPC-myWish#readme"
+       target="_blank"
+       rel="noopener noreferrer">
+      View README on GitHub
+    </a>
+    <br />
+    Powered by
+    <a href="https://spoorthy.org" target="_blank" rel="noopener noreferrer">
+      Spoorthy Innovations
+    </a>
+  </p>
+
+  <script src="popup.js"></script>
 </body>
 </html>
