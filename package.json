@@ -1,0 +1,11 @@
+{
+  "name": "fpaste-by-spoorthy",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "generate-icons": "node generate-icons.js"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}

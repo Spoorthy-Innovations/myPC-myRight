@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Generate extension icons</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 24px; max-width: 480px; }
+    h1 { font-size: 18px; }
+    .preview { display: flex; gap: 16px; align-items: flex-end; margin: 16px 0; }
+    .preview canvas { border: 1px solid #ccc; display: block; }
+    button { margin: 4px 8px 4px 0; padding: 8px 16px; cursor: pointer; }
+    p { color: #555; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Fpaste by Spoorthy – Icon generator</h1>
+  <p>Click each button to download the icon. Save the files into the <code>icons</code> folder (same folder as this file) so your extension and the Chrome Web Store can use them.</p>
+  <div class="preview">
+    <div><canvas id="c16" width="16" height="16"></canvas><br><small>16×16</small></div>
+    <div><canvas id="c48" width="48" height="48"></canvas><br><small>48×48</small></div>
+    <div><canvas id="c128" width="128" height="128"></canvas><br><small>128×128</small></div>
+  </div>
+  <div>
+    <button id="dl16">Download icon16.png</button>
+    <button id="dl48">Download icon48.png</button>
+    <button id="dl128">Download icon128.png</button>
+  </div>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const s = canvas.width;
+      const pad = Math.max(1, s / 8);
+      const r = (s - pad * 2) / 2;
+
+      // Background circle
+      ctx.fillStyle = '#2196F3';
+      ctx.beginPath();
+      ctx.arc(s/2, s/2, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Clipboard / paste symbol (simplified)
+      ctx.strokeStyle = '#fff';
+      ctx.fillStyle = '#fff';
+      ctx.lineWidth = Math.max(1, s / 16);
+      ctx.lineCap = 'round';
+
+      const cx = s/2, cy = s/2;
+      const w = s * 0.35, h = s * 0.28;
+      // Rectangle (clipboard)
+      ctx.strokeRect(cx - w/2, cy - h/2 - s*0.05, w, h);
+      // "V" (paste)
+      ctx.beginPath();
+      ctx.moveTo(cx - w/3, cy - s*0.02);
+      ctx.lineTo(cx, cy + h/2);
+      ctx.lineTo(cx + w/3, cy - s*0.02);
+      ctx.stroke();
+    }
+
+    function drawAll() {
+      [16, 48, 128].forEach(function(size) {
+        var c = document.getElementById('c' + size);
+        c.width = size;
+        c.height = size;
+        drawIcon(c);
+      });
+    }
+    drawAll();
+
+    function download(canvas, filename) {
+      canvas.toBlob(function(blob) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png');
+    }
+
+    document.getElementById('dl16').onclick = function() {
+      drawAll();
+      download(document.getElementById('c16'), 'icon16.png');
+    };
+    document.getElementById('dl48').onclick = function() {
+      drawAll();
+      download(document.getElementById('c48'), 'icon48.png');
+    };
+    document.getElementById('dl128').onclick = function() {
+      drawAll();
+      download(document.getElementById('c128'), 'icon128.png');
+    };
+  </script>
+</body>
+</html>
