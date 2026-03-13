@@ -10,9 +10,11 @@ var fpasteOptions = {
   selection: true,
   rightClick: true,
   showPwd: true,
+  strongSelection: false,
 };
 var fpasteSelectionStyleEl = null;
 var fpasteDomRelaxed = false;
+var fpasteRelaxIntervalId = null;
 
 function applySelectionStyle(enabled) {
   if (!enabled) {
@@ -25,12 +27,15 @@ function applySelectionStyle(enabled) {
     var style = document.createElement('style');
     style.id = 'fpaste-selection-style';
     style.textContent =
-      '* { -webkit-user-select: text !important; user-select: text !important; } ' +
-      'input, textarea { -webkit-user-select: text !important; user-select: text !important; }';
+      '* { -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; } ' +
+      'input, textarea { -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; }';
     fpasteSelectionStyleEl = style;
   }
-  if (!fpasteSelectionStyleEl.parentNode) {
-    (document.head || document.documentElement).appendChild(fpasteSelectionStyleEl);
+  if (!fpasteSelectionStyleEl.parentNode || !document.contains(fpasteSelectionStyleEl)) {
+    var target = document.head || document.documentElement;
+    if (target) {
+      target.appendChild(fpasteSelectionStyleEl);
+    }
   }
 }
 
@@ -40,8 +45,13 @@ function relaxDOMForSelectionAndContext() {
   if (!body) return;
 
   try {
-    body.style.webkitUserSelect = 'text';
-    body.style.userSelect = 'text';
+    if (fpasteOptions.strongSelection) {
+      body.style.setProperty('-webkit-user-select', 'text', 'important');
+      body.style.setProperty('user-select', 'text', 'important');
+    } else {
+      body.style.webkitUserSelect = 'text';
+      body.style.userSelect = 'text';
+    }
   } catch (e) {}
 
   try {
@@ -50,13 +60,35 @@ function relaxDOMForSelectionAndContext() {
       el.removeAttribute('unselectable');
       el.removeAttribute('onselectstart');
       el.removeAttribute('oncontextmenu');
-      if (fpasteOptions.selection) {
-        el.style && (el.style.userSelect = 'text');
+      if (fpasteOptions.selection && el.style) {
+        if (fpasteOptions.strongSelection) {
+          el.style.setProperty('-webkit-user-select', 'text', 'important');
+          el.style.setProperty('-moz-user-select', 'text', 'important');
+          el.style.setProperty('-ms-user-select', 'text', 'important');
+          el.style.setProperty('user-select', 'text', 'important');
+        } else {
+          el.style.webkitUserSelect = 'text';
+          el.style.MozUserSelect = 'text';
+          el.style.msUserSelect = 'text';
+          el.style.userSelect = 'text';
+        }
       }
     });
   } catch (e) {}
 
   fpasteDomRelaxed = true;
+}
+
+function ensureRelaxTimer() {
+  if (fpasteRelaxIntervalId) return;
+  // Periodically re-apply DOM relax in case the page mutates after load.
+  fpasteRelaxIntervalId = setInterval(function () {
+    if (fpasteOptions.selection || fpasteOptions.rightClick) {
+      applySelectionStyle(fpasteOptions.selection);
+      fpasteDomRelaxed = false;
+      relaxDOMForSelectionAndContext();
+    }
+  }, 3000);
 }
 
 function setFpasteEnabled(enabled) {
@@ -69,6 +101,7 @@ function setFpasteEnabled(enabled) {
   applySelectionStyle(fpasteOptions.selection);
   if (on) {
     relaxDOMForSelectionAndContext();
+    ensureRelaxTimer();
   }
 }
 
@@ -78,9 +111,11 @@ function applyOptions(opts) {
   fpasteOptions.selection = !!opts.selection;
   fpasteOptions.rightClick = opts.rightClick !== false;
   fpasteOptions.showPwd = !!opts.showPwd;
+  fpasteOptions.strongSelection = !!opts.strongSelection;
   applySelectionStyle(fpasteOptions.selection);
   if (fpasteOptions.selection || fpasteOptions.rightClick) {
     relaxDOMForSelectionAndContext();
+    ensureRelaxTimer();
   }
 }
 
@@ -100,9 +135,73 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
 // Once DOM is ready, clean up inline blockers for selection/right-click
 document.addEventListener('DOMContentLoaded', function () {
   if (fpasteOptions.selection || fpasteOptions.rightClick) {
+    applySelectionStyle(fpasteOptions.selection);
     relaxDOMForSelectionAndContext();
   }
 });
+
+// Re-apply EVERYTHING once the entire page (including external scripts/frames) has fully loaded.
+window.addEventListener('load', function () {
+  if (fpasteOptions.selection || fpasteOptions.rightClick) {
+    applySelectionStyle(fpasteOptions.selection);
+    relaxDOMForSelectionAndContext();
+    
+    // Setup a MutationObserver as a last resort against highly aggressive sites
+    setupMutationObserver();
+
+    // The manual toggle OFF -> ON works because it runs entirely after the page's scripts 
+    // have established their blockers. Let's explicitly simulate that toggle 2 seconds 
+    // and 4 seconds after window.load.
+    setTimeout(function() {
+      if (fpasteOptions.selection) {
+        setFpasteEnabled(false);
+        setTimeout(function() {
+          setFpasteEnabled(true);
+        }, 100);
+      }
+    }, 2000);
+    
+    setTimeout(function() {
+      if (fpasteOptions.selection) {
+        setFpasteEnabled(false);
+        setTimeout(function() {
+          setFpasteEnabled(true);
+        }, 100);
+      }
+    }, 4500);
+  }
+});
+
+function setupMutationObserver() {
+  if (!fpasteOptions.selection) return;
+  var observer = new MutationObserver(function(mutations) {
+    var needsRelax = false;
+    for (var i = 0; i < mutations.length; i++) {
+        var mutation = mutations[i];
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            needsRelax = true;
+            break;
+        } else if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+           needsRelax = true;
+           break;
+        }
+    }
+    
+    if (needsRelax) {
+        // Debounce the relax call slightly to avoid freezing the browser on heavy mutations
+        fpasteDomRelaxed = false;
+        applySelectionStyle(fpasteOptions.selection);
+        relaxDOMForSelectionAndContext();
+    }
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class']
+  });
+}
 
 var allowPaste = function (e) {
   if (!fpasteOptions.paste) {
@@ -129,13 +228,14 @@ var allowCut = function (e) {
 };
 
 // Capture phase (true) = we run first, before the page's listeners
-document.addEventListener('paste', allowPaste, true);
-document.addEventListener('copy', allowCopy, true);
-document.addEventListener('cut', allowCut, true);
+// Attach to window so it runs before document listeners
+window.addEventListener('paste', allowPaste, true);
+window.addEventListener('copy', allowCopy, true);
+window.addEventListener('cut', allowCut, true);
 
 // Improve text selection: stop page handlers from blocking selection,
 // but do NOT interfere with click handlers on buttons/controls.
-document.addEventListener(
+window.addEventListener(
   'selectstart',
   function (e) {
     if (!fpasteOptions.selection) return true;
@@ -149,8 +249,32 @@ document.addEventListener(
   true
 );
 
+// Some sites block selection via mousedown/mouseup handlers instead of selectstart.
+// We stop their handlers in capture phase, but try to avoid breaking real controls.
+function fpasteIsInteractiveTarget(target) {
+  if (!target || !target.closest) return false;
+  return !!target.closest(
+    'a, button, input, textarea, select, [contenteditable="true"], [role="button"], [role="link"]'
+  );
+}
+
+['mousedown', 'mouseup'].forEach(function (type) {
+  window.addEventListener(
+    type,
+    function (e) {
+      if (!fpasteOptions.selection) return true;
+      if (fpasteIsInteractiveTarget(e.target)) return true;
+      // Allow default behavior (so clicks still work), but stop page handlers
+      // that try to cancel selection on regular text.
+      e.stopImmediatePropagation();
+      return true;
+    },
+    true
+  );
+});
+
 // Force-enable right click (context menu)
-document.addEventListener(
+window.addEventListener(
   'contextmenu',
   function (e) {
     if (!fpasteOptions.rightClick) return true;
