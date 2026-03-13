@@ -15,6 +15,7 @@ var fpasteOptions = {
 var fpasteSelectionStyleEl = null;
 var fpasteDomRelaxed = false;
 var fpasteRelaxIntervalId = null;
+var fpasteGlobalEnabled = true;
 
 function applySelectionStyle(enabled) {
   if (!enabled) {
@@ -94,14 +95,15 @@ function ensureRelaxTimer() {
 }
 
 function setFpasteEnabled(enabled) {
-  var on = !!enabled;
-  fpasteOptions.copy = on;
-  fpasteOptions.paste = on;
-  fpasteOptions.selection = on;
-  fpasteOptions.rightClick = on;
-  fpasteOptions.showPwd = on;
+  fpasteGlobalEnabled = !!enabled;
+  if (!fpasteGlobalEnabled) {
+    applySelectionStyle(false);
+    return;
+  }
+  
+  // Re-apply current specific states if globally enabled
   applySelectionStyle(fpasteOptions.selection);
-  if (on) {
+  if (fpasteOptions.selection || fpasteOptions.rightClick) {
     relaxDOMForSelectionAndContext();
     ensureRelaxTimer();
   }
@@ -114,6 +116,9 @@ function applyOptions(opts) {
   fpasteOptions.rightClick = opts.rightClick !== false;
   fpasteOptions.showPwd = !!opts.showPwd;
   fpasteOptions.strongSelection = !!opts.strongSelection;
+  
+  if (!fpasteGlobalEnabled) return;
+  
   applySelectionStyle(fpasteOptions.selection);
   if (fpasteOptions.selection || fpasteOptions.rightClick) {
     relaxDOMForSelectionAndContext();
@@ -122,20 +127,25 @@ function applyOptions(opts) {
 }
 
 // Load current setting (default: all features ON)
-// Start with everything enabled immediately, then override from storage if needed.
-setFpasteEnabled(true);
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
   chrome.storage.sync.get({ fpasteOptions: null, fpasteEnabled: true }, function (data) {
+    if (data && typeof data.fpasteEnabled !== 'undefined') {
+      fpasteGlobalEnabled = !!data.fpasteEnabled;
+    }
     if (data && data.fpasteOptions) {
       applyOptions(data.fpasteOptions);
-    } else if (data && typeof data.fpasteEnabled !== 'undefined') {
-      setFpasteEnabled(data.fpasteEnabled);
+    } else {
+       // initialize properly
+       setFpasteEnabled(fpasteGlobalEnabled);
     }
   });
+} else {
+  setFpasteEnabled(true);
 }
 
 // Once DOM is ready, clean up inline blockers for selection/right-click
 document.addEventListener('DOMContentLoaded', function () {
+  if (!fpasteGlobalEnabled) return;
   if (fpasteOptions.selection || fpasteOptions.rightClick) {
     applySelectionStyle(fpasteOptions.selection);
     relaxDOMForSelectionAndContext();
@@ -144,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Re-apply EVERYTHING once the entire page (including external scripts/frames) has fully loaded.
 window.addEventListener('load', function () {
+  if (!fpasteGlobalEnabled) return;
   if (fpasteOptions.selection || fpasteOptions.rightClick) {
     applySelectionStyle(fpasteOptions.selection);
     relaxDOMForSelectionAndContext();
@@ -154,7 +165,7 @@ window.addEventListener('load', function () {
 });
 
 function setupMutationObserver() {
-  if (!fpasteOptions.selection) return;
+  if (!fpasteOptions.selection || !fpasteGlobalEnabled) return;
   var observer = new MutationObserver(function(mutations) {
     var needsRelax = false;
     for (var i = 0; i < mutations.length; i++) {
@@ -189,7 +200,7 @@ function setupMutationObserver() {
 }
 
 var allowPaste = function (e) {
-  if (!fpasteOptions.paste) {
+  if (!fpasteGlobalEnabled || !fpasteOptions.paste) {
     return true;
   }
   e.stopImmediatePropagation();
@@ -197,7 +208,7 @@ var allowPaste = function (e) {
 };
 
 var allowCopy = function (e) {
-  if (!fpasteOptions.copy) {
+  if (!fpasteGlobalEnabled || !fpasteOptions.copy) {
     return true;
   }
   e.stopImmediatePropagation();
@@ -205,7 +216,7 @@ var allowCopy = function (e) {
 };
 
 var allowCut = function (e) {
-  if (!fpasteOptions.copy) {
+  if (!fpasteGlobalEnabled || !fpasteOptions.copy) {
     return true;
   }
   e.stopImmediatePropagation();
@@ -223,7 +234,7 @@ window.addEventListener('cut', allowCut, true);
 window.addEventListener(
   'selectstart',
   function (e) {
-    if (!fpasteOptions.selection) return true;
+    if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
     // On first real selection attempt, aggressively relax DOM again
     // in case the page changed after initial load.
     relaxDOMForSelectionAndContext();
@@ -247,7 +258,7 @@ function fpasteIsInteractiveTarget(target) {
   window.addEventListener(
     type,
     function (e) {
-      if (!fpasteOptions.selection) return true;
+      if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
       if (fpasteIsInteractiveTarget(e.target)) return true;
       // Allow default behavior (so clicks still work), but stop page handlers
       // that try to cancel selection on regular text.
@@ -262,7 +273,7 @@ function fpasteIsInteractiveTarget(target) {
 window.addEventListener(
   'contextmenu',
   function (e) {
-    if (!fpasteOptions.rightClick) return true;
+    if (!fpasteGlobalEnabled || !fpasteOptions.rightClick) return true;
     // Stop page handlers from blocking the context menu, but don't prevent default
     e.stopImmediatePropagation();
     return true;
@@ -271,7 +282,7 @@ window.addEventListener(
 );
 
 function fpasteShowPassword(el) {
-  if (!fpasteOptions.showPwd) return;
+  if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return;
   if (!el || el.tagName !== 'INPUT') return;
   var type = (el.getAttribute('type') || '').toLowerCase();
   if (type !== 'password' && el.dataset.fpastePwd !== 'visible') return;
@@ -291,7 +302,7 @@ function fpasteHidePassword(el) {
 document.addEventListener(
   'mouseover',
   function (e) {
-    if (!fpasteOptions.showPwd) return true;
+    if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
     fpasteShowPassword(e.target);
     return true;
   },
@@ -301,7 +312,7 @@ document.addEventListener(
 document.addEventListener(
   'focus',
   function (e) {
-    if (!fpasteOptions.showPwd) return true;
+    if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
     fpasteShowPassword(e.target);
     return true;
   },
@@ -311,7 +322,7 @@ document.addEventListener(
 document.addEventListener(
   'mouseout',
   function (e) {
-    if (!fpasteOptions.showPwd) return true;
+    if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
     fpasteHidePassword(e.target);
     return true;
   },
@@ -321,7 +332,7 @@ document.addEventListener(
 document.addEventListener(
   'blur',
   function (e) {
-    if (!fpasteOptions.showPwd) return true;
+    if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
     fpasteHidePassword(e.target);
     return true;
   },
@@ -343,13 +354,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
       applyOptions(message.options);
       if (chrome.storage && chrome.storage.sync) {
         chrome.storage.sync.set({
-          fpasteOptions: fpasteOptions,
-          fpasteEnabled:
-            !!fpasteOptions.copy &&
-            !!fpasteOptions.paste &&
-            !!fpasteOptions.selection &&
-            !!fpasteOptions.rightClick &&
-            !!fpasteOptions.showPwd,
+          fpasteOptions: fpasteOptions
         });
       }
       sendResponse({ ok: true });

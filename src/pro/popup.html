@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 8px 0;
+      color: #1a1a2e;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pro-badge {
+      background: linear-gradient(135deg, #ffd700, #ff8c00);
+      color: #000;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .logo {
+      display: block;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      margin: 0 0 8px 0;
+    }
+    p {
+      font-size: 13px;
+      color: #555;
+      margin: 0 0 12px 0;
+      line-height: 1.4;
+    }
+    .footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      text-align: left;
+    }
+    .options {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .label {
+      flex: 1;
+      color: #333;
+    }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      border-radius: 999px;
+      background: #ccc;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+    .toggle-handle {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 2px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
+    }
+    .toggle.on {
+      background: #4CAF50;
+    }
+    .toggle.on .toggle-handle {
+      transform: translateX(20px);
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .header-row .logo {
+      margin: 0;
+    }
+    .header-row h1 {
+      margin: 0;
+      flex: 1;
+    }
+    .master-toggle {
+      background: #dc3545;
+    }
+    .master-toggle.on {
+      background: #4CAF50;
+    }
+
+    /* Pro styles */
+    .section {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+    }
+    .section-title {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .toggle-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .toggle-label {
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+    }
+    .toggle-desc {
+      font-size: 10px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-row">
+    <img src="icons/icon48.png" alt="myPC myRight logo" class="logo" />
+    <h1>myPC myRight <span class="pro-badge">Pro</span></h1>
+    <div id="toggleMaster" class="toggle master-toggle"><div class="toggle-handle"></div></div>
+  </div>
+  <p>
+    by
+    <a href="https://yagati.com/vasavya" target="_blank" rel="noopener noreferrer">
+      Vasavya Yagati
+    </a>
+  </p>
+  <p>Choose what myPC myRight should force on this page.</p>
+
+  <div class="options">
+    <div class="row">
+      <span class="label">Copy</span>
+      <div id="toggleCopy" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Paste</span>
+      <div id="togglePaste" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Selection</span>
+      <div id="toggleSelection" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Right click</span>
+      <div id="toggleRightClick" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Show password</span>
+      <div id="togglePwd" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+  </div>
+
+  <!-- Extra Features -->
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-icon">⚡</span> Advanced
+    </h2>
+
+    <div class="toggle-row" id="rowVisibilityBypass">
+      <div class="toggle-info">
+        <span class="toggle-label">Visibility Bypass</span>
+        <span class="toggle-desc">Prevent tab-switch detection</span>
+      </div>
+      <div id="toggleVisibilityBypass" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row" id="rowKeyboardUnblock">
+      <div class="toggle-info">
+        <span class="toggle-label">Keyboard Unblock</span>
+        <span class="toggle-desc">Unlock F12, Ctrl+U, Ctrl+S</span>
+      </div>
+      <div id="toggleKeyboardUnblock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row" id="rowOverlayRemoval">
+      <div class="toggle-info">
+        <span class="toggle-label">Overlay Removal</span>
+        <span class="toggle-desc">Remove invisible layers</span>
+      </div>
+      <div id="toggleOverlayRemoval" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row" id="rowDragDropUnlock">
+      <div class="toggle-info">
+        <span class="toggle-label">Drag & Drop</span>
+        <span class="toggle-desc">Unlock dragging elements</span>
+      </div>
+      <div id="toggleDragDropUnlock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row" id="rowPrintUnlock">
+      <div class="toggle-info">
+        <span class="toggle-label">Print Unlock</span>
+        <span class="toggle-desc">Remove hidden-on-print rules</span>
+      </div>
+      <div id="togglePrintUnlock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+  </section>
+
+  <!-- Power Tools -->
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-icon">🛠️</span> Power Tools
+    </h2>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="toggle-label">Scroll Unlock</span>
+        <span class="toggle-desc">Force scrolling on locked pages</span>
+      </div>
+      <div id="toggleScrollUnlock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="toggle-label">Video Controls</span>
+        <span class="toggle-desc">Force HTML5 native controls</span>
+      </div>
+      <div id="toggleVideoUnlock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="toggle-label">Autocomplete Enforcer</span>
+        <span class="toggle-desc">Force form password saving</span>
+      </div>
+      <div id="toggleAutocompleteUnlock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="toggle-label">Exit Dialog Bypass</span>
+        <span class="toggle-desc">Kill "Are you sure?" popups</span>
+      </div>
+      <div id="toggleBeforeUnloadBypass" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="toggle-label">Element Zapper</span>
+        <span class="toggle-desc">Alt+Shift+Click to delete</span>
+      </div>
+      <div id="toggleZapperUnlock" class="toggle small-toggle"><div class="toggle-handle"></div></div>
+    </div>
+  </section>
+
+  <p class="footer">
+    <a href="https://github.com/Spoorthy-Innovations/myPC-myRight#readme"
+       target="_blank"
+       rel="noopener noreferrer">
+      View README on GitHub
+    </a>
+    <br />
+    Powered by
+    <a href="https://spoorthy.org" target="_blank" rel="noopener noreferrer">
+      Spoorthy Innovations
+    </a>
+  </p>
+
+  <script src="popup.js"></script>
+  <script src="popup-pro.js"></script>
+</body>
+</html>

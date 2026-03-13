@@ -11,16 +11,13 @@ function readOptionsFromUI() {
     rightClick: document.getElementById('toggleRightClick')?.classList.contains('on'),
     showPwd: document.getElementById('togglePwd')?.classList.contains('on'),
     strongSelection: document.getElementById('toggleStrongSelection')?.classList.contains('on'),
-  };
-}
-
 function applyOptionsToUI(opts) {
   setToggle(document.getElementById('toggleCopy'), opts.copy);
   setToggle(document.getElementById('togglePaste'), opts.paste);
   setToggle(document.getElementById('toggleSelection'), opts.selection);
   setToggle(document.getElementById('toggleRightClick'), opts.rightClick);
   setToggle(document.getElementById('togglePwd'), opts.showPwd);
-   setToggle(document.getElementById('toggleStrongSelection'), opts.strongSelection);
+  setToggle(document.getElementById('toggleStrongSelection'), opts.strongSelection);
 }
 
 function saveAndSendOptions(opts) {
@@ -28,14 +25,7 @@ function saveAndSendOptions(opts) {
   chrome.storage.sync.set(
     {
       fpasteOptions: opts,
-      // keep legacy single flag roughly in sync (all true/false)
-      fpasteEnabled: !!(
-        opts.copy &&
-        opts.paste &&
-        opts.selection &&
-        opts.rightClick &&
-        opts.showPwd
-      ),
+      fpasteOptions: opts
     },
     function () {
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -88,6 +78,12 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       opts = Object.assign({}, defaultOptions, opts);
     }
+    if (typeof data.fpasteEnabled !== 'undefined') {
+      setToggle(document.getElementById('toggleMaster'), data.fpasteEnabled);
+    } else {
+      setToggle(document.getElementById('toggleMaster'), true); // default ON
+    }
+
     applyOptionsToUI(opts);
     // Ensure current tab gets the effective defaults/options even
     // if the user hasn't toggled anything yet.
@@ -110,5 +106,29 @@ document.addEventListener('DOMContentLoaded', function () {
   attachToggle('toggleRightClick');
   attachToggle('togglePwd');
   attachToggle('toggleStrongSelection');
+
+  const masterToggle = document.getElementById('toggleMaster');
+  if (masterToggle) {
+    masterToggle.addEventListener('click', function () {
+      const isNowOn = !masterToggle.classList.contains('on');
+      setToggle(masterToggle, isNowOn);
+      
+      if (!chrome || !chrome.storage || !chrome.tabs) return;
+      
+      chrome.storage.sync.set({ fpasteEnabled: isNowOn }, function() {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          if (tabs && tabs[0]) {
+            chrome.tabs.sendMessage(
+              tabs[0].id,
+              { type: 'fpaste:setEnabled', enabled: isNowOn },
+              function () {
+                if (chrome.runtime && chrome.runtime.lastError) {}
+              }
+            );
+          }
+        });
+      });
+    });
+  }
 });
 

@@ -77,11 +77,33 @@
     .toggle.on .toggle-handle {
       transform: translateX(20px);
     }
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .header-row .logo {
+      margin: 0;
+    }
+    .header-row h1 {
+      margin: 0;
+      flex: 1;
+    }
+    .master-toggle {
+      background: #dc3545;
+    }
+    .master-toggle.on {
+      background: #4CAF50;
+    }
   </style>
 </head>
 <body>
-  <img src="icons/icon48.png" alt="myPC myRight logo" class="logo" />
-  <h1>myPC myRight</h1>
+  <div class="header-row">
+    <img src="icons/icon48.png" alt="myPC myRight logo" class="logo" />
+    <h1>myPC myRight</h1>
+    <div id="toggleMaster" class="toggle master-toggle"><div class="toggle-handle"></div></div>
+  </div>
   <p>
     by
     <a href="https://yagati.com/vasavya" target="_blank" rel="noopener noreferrer">

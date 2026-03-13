@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "generate-icons": "node generate-icons.js"
+    "generate-icons": "node generate-icons.js",
+    "build": "node build.js"
   },
   "devDependencies": {
     "pngjs": "^7.0.0"
