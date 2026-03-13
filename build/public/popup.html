@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 8px 0;
+      color: #1a1a2e;
+    }
+    .logo {
+      display: block;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      margin: 0 0 8px 0;
+    }
+    p {
+      font-size: 13px;
+      color: #555;
+      margin: 0 0 12px 0;
+      line-height: 1.4;
+    }
+    .footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      text-align: left;
+    }
+    .options {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .label {
+      flex: 1;
+      color: #333;
+    }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      border-radius: 999px;
+      background: #ccc;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+    .toggle-handle {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 2px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
+    }
+    .toggle.on {
+      background: #4CAF50;
+    }
+    .toggle.on .toggle-handle {
+      transform: translateX(20px);
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .header-row .logo {
+      margin: 0;
+    }
+    .header-row h1 {
+      margin: 0;
+      flex: 1;
+    }
+    .master-toggle {
+      background: #dc3545;
+    }
+    .master-toggle.on {
+      background: #4CAF50;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-row">
+    <img src="icons/icon48.png" alt="myPC myRight logo" class="logo" />
+    <h1>myPC myRight</h1>
+    <div id="toggleMaster" class="toggle master-toggle"><div class="toggle-handle"></div></div>
+  </div>
+  <p>
+    by
+    <a href="https://yagati.com/vasavya" target="_blank" rel="noopener noreferrer">
+      Vasavya Yagati
+    </a>
+  </p>
+  <p>Choose what myPC myRight should force on this page.</p>
+
+  <div class="options">
+    <div class="row">
+      <span class="label">Copy</span>
+      <div id="toggleCopy" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Paste</span>
+      <div id="togglePaste" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Selection</span>
+      <div id="toggleSelection" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Right click</span>
+      <div id="toggleRightClick" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+    <div class="row">
+      <span class="label">Show password</span>
+      <div id="togglePwd" class="toggle"><div class="toggle-handle"></div></div>
+    </div>
+  </div>
+
+  <p class="footer">
+    <a href="https://github.com/Spoorthy-Innovations/myPC-myRight#readme"
+       target="_blank"
+       rel="noopener noreferrer">
+      View README on GitHub
+    </a>
+    <br />
+    Powered by
+    <a href="https://spoorthy.org" target="_blank" rel="noopener noreferrer">
+      Spoorthy Innovations
+    </a>
+  </p>
+
+  <script src="popup.js"></script>
+</body>
+</html>
