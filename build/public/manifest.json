@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "myPC myRight",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "myPC myRight lets you force copy, paste, selection, right-click and password visibility on websites that try to block them.",
   "permissions": [
     "activeTab",

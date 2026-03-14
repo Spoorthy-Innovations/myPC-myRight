@@ -84,14 +84,14 @@ function relaxDOMForSelectionAndContext() {
 
 function ensureRelaxTimer() {
   if (fpasteRelaxIntervalId) return;
-  // Periodically re-apply DOM relax in case the page mutates after load.
+  // Periodically re-apply DOM relax in case the page mutates after load. 10s to save CPU/battery.
   fpasteRelaxIntervalId = setInterval(function () {
     if (fpasteOptions.selection || fpasteOptions.rightClick) {
       applySelectionStyle(fpasteOptions.selection);
       fpasteDomRelaxed = false;
       relaxDOMForSelectionAndContext();
     }
-  }, 3000);
+  }, 10000);
 }
 
 function setFpasteEnabled(enabled) {
@@ -166,29 +166,38 @@ window.addEventListener('load', function () {
 
 function setupMutationObserver() {
   if (!fpasteOptions.selection || !fpasteGlobalEnabled) return;
-  var observer = new MutationObserver(function(mutations) {
+  var relaxDebounceTimer = null;
+  var DEBOUNCE_MS = 120;
+
+  var scheduleRelax = function () {
+    if (relaxDebounceTimer) clearTimeout(relaxDebounceTimer);
+    relaxDebounceTimer = setTimeout(function () {
+      relaxDebounceTimer = null;
+      if (!fpasteOptions.selection || !fpasteGlobalEnabled) return;
+      fpasteDomRelaxed = false;
+      applySelectionStyle(fpasteOptions.selection);
+      relaxDOMForSelectionAndContext();
+    }, DEBOUNCE_MS);
+  };
+
+  var observer = new MutationObserver(function (mutations) {
     var needsRelax = false;
     for (var i = 0; i < mutations.length; i++) {
-        var mutation = mutations[i];
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            for (var j = 0; j < mutation.addedNodes.length; j++) {
-                if (mutation.addedNodes[j] !== fpasteSelectionStyleEl) {
-                    needsRelax = true;
-                    break;
-                }
-            }
-        } else if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-           needsRelax = true;
-           break;
+      var mutation = mutations[i];
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        for (var j = 0; j < mutation.addedNodes.length; j++) {
+          if (mutation.addedNodes[j] !== fpasteSelectionStyleEl) {
+            needsRelax = true;
+            break;
+          }
         }
+      } else if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+        needsRelax = true;
+        break;
+      }
+      if (needsRelax) break;
     }
-    
-    if (needsRelax) {
-        // Debounce the relax call slightly to avoid freezing the browser on heavy mutations
-        fpasteDomRelaxed = false;
-        applySelectionStyle(fpasteOptions.selection);
-        relaxDOMForSelectionAndContext();
-    }
+    if (needsRelax) scheduleRelax();
   });
 
   observer.observe(document.documentElement, {
@@ -246,12 +255,22 @@ window.addEventListener(
 );
 
 // Some sites block selection via mousedown/mouseup handlers instead of selectstart.
-// We stop their handlers in capture phase, but try to avoid breaking real controls.
+// We stop their handlers in capture phase only when the click is in main content,
+// so we never break app chrome (Gmail right panel: Contacts, Calendar, Tasks, etc.).
 function fpasteIsInteractiveTarget(target) {
   if (!target || !target.closest) return false;
   return !!target.closest(
-    'a, button, input, textarea, select, [contenteditable="true"], [role="button"], [role="link"]'
+    'a, button, input, textarea, select, [contenteditable="true"], ' +
+    '[role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"], ' +
+    '[onclick], [tabindex]:not([tabindex="-1"])'
   );
+}
+
+// Only stop mousedown/mouseup when click is inside main content. Never stop in nav/sidebar/toolbar
+// (Gmail right panel and similar UIs use plain divs with JS handlers - not detectable by role).
+function fpasteIsMainContent(target) {
+  if (!target || !target.closest) return false;
+  return !!target.closest('main, [role="main"], article');
 }
 
 ['mousedown', 'mouseup'].forEach(function (type) {
@@ -260,6 +279,8 @@ function fpasteIsInteractiveTarget(target) {
     function (e) {
       if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
       if (fpasteIsInteractiveTarget(e.target)) return true;
+      // Only interfere in main content; never in sidebar/nav/toolbar so Gmail icons keep working
+      if (!fpasteIsMainContent(e.target)) return true;
       // Allow default behavior (so clicks still work), but stop page handlers
       // that try to cancel selection on regular text.
       e.stopImmediatePropagation();
