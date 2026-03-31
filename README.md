@@ -1,101 +1,128 @@
-# myPC myRight ✂️📋🔒➡️🔓
+# myPC myRight
 
-myPC myRight is a Chrome extension that **forces paste and copy**, unlocks **text selection**, **right click**, and can **temporarily show password fields on hover/focus**, even on websites that try to block them. 🚀
+`myPC myRight` is a Chrome extension focused on restoring normal browser controls on restrictive websites: selection, copy/paste, right-click, and optional password visibility helpers.
 
-## Features 🌟
+This repository contains both editions:
+- **Public** (`myPC myRight`)
+- **Pro** (`myPC myRight Pro`)
 
-- ✨ **Force paste**: lets you paste text into fields on sites that block `Ctrl+V` / `Cmd+V`.
-- ⚡ **Force copy & cut**: blocks page handlers that try to stop `Ctrl+C` / `Cmd+X`.
-- 🖱️ **Unlock selection**: overrides `user-select: none` and similar tricks so you can select text.
-- 🧩 **Right click**: re‑enables the browser context menu when sites try to disable it.
-- 👁️‍🗨️ **Show password on hover/focus**: when enabled, password fields temporarily show as plain text while you hover or edit, then hide again when you move away or blur.
+## Core Features (Public + Pro)
 
-Technically, myPC myRight injects a content script that runs at `document_start` and registers its own listeners in the **capture phase**, calling `stopImmediatePropagation()` to prevent the page from blocking normal browser behavior, without calling `preventDefault()` so the default copy/paste/select actions still occur. 🧠
+- **Selection + Copy/Paste (combined toggle)**  
+  One switch controls text selection, copy, and paste enforcement together.
+- **Right click unlock**  
+  Re-enables context menu where websites try to block it.
+- **Show password**  
+  Temporarily reveals password-like fields during hover/focus for easier verification.
+- **Global ON/OFF master toggle**  
+  Quickly enable or disable the extension behavior for the current tab context.
+- **Website exclusions settings**  
+  Users can exclude host patterns where extension logic should not run.
 
-## Install in Chrome (Public) 🆓
+### Default Excluded Hosts
 
-1. Open Chrome and go to `chrome://extensions/`.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked**.
-4. Select this folder: `myPC-myRight` (the one containing `manifest.json`).
-5. The extension will appear in your toolbar. You can pin it to see “myPC myRight by Spoorthy”.
+These are preconfigured to avoid conflicts with rich editors:
+- `docs.google.com`
+- `drive.google.com`
+- `docs.microsoft.com`
+- `*.officeapps.live.com`
 
-## Install in Chrome (Pro) 💎
+Users can edit this list from **Manage site exclusions** in popup (or extension options page).
 
-The **Pro version** lives under `src/pro` and ships as a separate extension called **“myPC myRight Pro”**.
+## Pro Features
 
-1. Open Chrome and go to `chrome://extensions/`.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked**.
-4. Select the `src/pro` folder (the one containing `manifest.json` for Pro).
-5. You will see a second extension in the toolbar named **“myPC myRight Pro”** with a gold **Pro** badge in the popup.
+In addition to all Public features, Pro includes:
 
-## Usage (Public) 🖥️
+### Advanced
+- **Visibility Bypass**
+- **Keyboard Unblock**
+- **Overlay Removal**
+- **Drag & Drop Unlock**
+- **Print Unlock**
 
-- 💻 On any tab, use **Ctrl+V** (Windows/Linux) or **Cmd+V** (Mac) to paste, and **Ctrl+C** / **Cmd+C** to copy, even on sites that normally block it.
-- 🧷 Click the extension icon to open the popup.
-- 🎚️ Use the toggles to enable/disable:
-  - ✅ **Copy**
-  - ✅ **Paste**
-  - ✅ **Selection**
-  - ✅ **Right click**
-  - ✅ **Show password on hover/focus**
+### Power Tools
+- **Scroll Unlock**
+- **Video Controls**
+- **Autocomplete Enforcer**
+- **Exit Dialog Bypass**
+- **Element Zapper**
 
-## Usage (Pro) 💼
+> Pro Advanced toggles are currently defaulted to OFF for safer first-time behavior.
 
-When you click the **myPC myRight Pro** icon you get all the free toggles plus two extra sections: **Advanced** and **Power Tools**. ⚙️
+## Install (Unpacked)
 
-- ⚡ **Advanced**
-  - 👀 **Visibility Bypass**: prevents sites from detecting tab switches using the Page Visibility API or blur/focus tricks.
-  - ⌨️ **Keyboard Unblock**: unlocks F12, Ctrl+U, Ctrl+S, Ctrl+P, Ctrl+Shift+I/J/C so sites cannot cancel them.
-  - 🧼 **Overlay Removal**: detects and neutralizes transparent, full‑page overlay layers that block clicks or selection.
-  - 🖱️ **Drag & Drop**: re‑enables dragging text and images by undoing `ondragstart` and anti‑drag CSS.
-  - 🖨️ **Print Unlock**: injects print CSS so pages cannot hide text when you print or save as PDF.
+1. Open `chrome://extensions/`
+2. Turn on **Developer mode**
+3. Click **Load unpacked**
+4. Select one of:
+   - `build/public` for Public edition
+   - `build/pro` for Pro edition
 
-- 🛠️ **Power Tools**
-  - 🧭 **Scroll Unlock**: forces scrollbars back on pages that lock scrolling (e.g., paywalls or full‑screen modals).
-  - 🎬 **Video Controls**: forces native HTML5 video controls to appear and stay usable.
-  - 🔐 **Autocomplete Enforcer**: removes `autocomplete="off"`/`new-password` so the browser can offer to save passwords.
-  - 🚪 **Exit Dialog Bypass**: kills “Are you sure you want to leave?” beforeunload popups.
-  - 🧨 **Element Zapper**: when enabled, **Alt+Shift+Click** instantly removes any element you click on.
+## Build ZIP Artifacts
 
-## Why it’s generally OK ✅
+Run:
 
-- 🧱 **No remote code**: Everything runs locally; all JavaScript is packaged inside the extension. This follows Chrome Manifest V3 security requirements.
-- 🔐 **Minimal permissions**:
-  - 🌐 `content_scripts` on `<all_urls>` (needed so myPC myWIsh can work on any page).
-  - 🪪 `activeTab`, `storage`. No host-permission abuse, no network access, no external APIs.
-- 🕵️‍♀️ **No data collection**: The code never reads or sends passwords, cookies, browsing history, or any other personal data. It only adjusts browser behavior (events and CSS) to stop sites from blocking standard copy/paste/selection/right-click/password visibility.
+```powershell
+.\build.ps1
+```
 
-## Status 🚀
+This generates versioned ZIPs in `build/`, e.g.:
+- `myPC-myRight-public-2.0.0.zip`
+- `myPC-myRight-pro-2.0.0.zip`
 
-Both **Public 🆓** and **Pro 💎** versions have been **submitted to the Chrome Web Store for review** ✅ and are currently **waiting to appear in the store listings** 🕒.
+## Screenshots
 
-## Building and releasing 🏗️📦
+### Popup UI
 
-See **BUILD.md** for detailed build & release steps (CLI commands, ZIP generation, and version bump checklist). 📝
+![myPC myRight popup screenshot](./Screenshot2.png)
 
-## Privacy statement 🔒
+## Update Experience
 
-- 🎯 **Single purpose (Public)**  
-  myPC myRight *“allows users to force copy, paste, text selection, right click, and temporary password visibility on webpages that try to block them.”*
+The extension includes:
+- version shown in popup
+- optional Web Store update availability message
+- update notice banner
+- local changelog page on update events
 
-- 🎯 **Single purpose (Pro)**  
-  myPC myRight Pro *“allows users to force copy, paste, selection, right-click, password visibility, and advanced controls (e.g. DevTools unlock, print, scroll, video controls, overlay removal) on webpages that try to block them.”*
+## Permissions
 
-- 🚫 **No data collection**  
-  Both extensions *“do not collect, store, or transmit any personal or usage data. All processing happens locally in the browser.”*
+Main permissions used:
+- `storage` (settings/options)
+- `activeTab`
+- `tabs` (update/changelog UX)
+- content scripts on `<all_urls>` (for behavior control where enabled)
 
-- 👁️‍🗨️ **Password behavior**  
-  When the password feature is enabled, it can **temporarily show password fields on hover/focus** so the user can see what they typed. Passwords are never sent anywhere; this behavior is intentional, user‑visible, and fully controlled by the user via the popup toggle.
+No external API calls are required for core functionality.
 
-Built by **Vasavya Yagati** at **Spoorthy Innovations**. 💚
+## Privacy
 
-## Contact 📬
+- No personal data collection or transmission
+- No credential export
+- Behavior is local to the browser session and controlled by user toggles/options
 
-- 👤 **Name**: Vasavya Yagati  
-- 📧 **Email**: [vasavya@yagati.com](mailto:vasavya@yagati.com)  
-- 🏢 **Company Email**: [info@spoorthy.org](mailto:info@spoorthy.org)  
-- 🌐 **Website**: [http://spoorthy.org](http://spoorthy.org)  
+## Version History
 
-This is the **first free product** from **Spoorthy Innovations and Research Foundation** (`spoorthy.org`). 🎉
+### 2.0.0 (current)
+- Version bump to `2.0.0`
+- Combined `Selection + Copy/Paste` toggle
+- Added website exclusions options page
+- Added popup shortcut to manage exclusions
+- Added update notice flow and popup update messaging
+- Popup layout improvements (version + exclusions on one line)
+- Improved compatibility and stability refinements
+
+### 1.0.4
+- Intermediate stabilization release (selection/clipboard compatibility and UI updates)
+
+### 1.0.2
+- Stable baseline release used by many users before major 2.x updates
+
+For detailed project-level changes, see [`CHANGELOG.md`](./CHANGELOG.md).  
+For Public release summary from `1.0.2` to `2.0.0`, see [`RELEASE_NOTES_PUBLIC_2.0.0.md`](./RELEASE_NOTES_PUBLIC_2.0.0.md).
+
+## Contact
+
+- **Vasavya Yagati**
+- **Email:** [vasavya@yagati.com](mailto:vasavya@yagati.com)
+- **Company:** [info@spoorthy.org](mailto:info@spoorthy.org)
+- **Website:** [https://spoorthy.org/](https://spoorthy.org/)
