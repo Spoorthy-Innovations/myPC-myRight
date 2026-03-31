@@ -101,6 +101,54 @@
       opacity: 0.55;
       cursor: default;
     }
+    .version {
+      font-size: 11px;
+      color: #888;
+      margin: -4px 0 10px 0;
+    }
+    .version-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: -4px 0 10px 0;
+      font-size: 11px;
+      color: #888;
+    }
+    .store-update {
+      display: none;
+      font-size: 11px;
+      color: #0b57d0;
+      margin: -6px 0 10px 0;
+    }
+    .store-update.show {
+      display: block;
+    }
+    .update-notice {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 10px 0;
+      padding: 8px 10px;
+      border: 1px solid #f6c246;
+      border-radius: 8px;
+      background: #fff7d6;
+      color: #4e3b00;
+      font-size: 12px;
+    }
+    .update-notice.show {
+      display: flex;
+    }
+    .update-close {
+      border: 0;
+      background: transparent;
+      color: #4e3b00;
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
   </style>
 </head>
 <body>
@@ -109,26 +157,27 @@
     <h1>myPC myRight</h1>
     <div id="toggleMaster" class="toggle master-toggle"><div class="toggle-handle"></div></div>
   </div>
+  <div class="version-row">
+    <span class="version" id="appVersion" aria-label="Extension version"></span>
+    <a href="#" id="openExclusions">Manage site exclusions</a>
+  </div>
+  <p class="store-update" id="storeUpdateVersion" aria-live="polite"></p>
+  <div id="updateNotice" class="update-notice" role="status" aria-live="polite">
+    <span id="updateNoticeText"></span>
+    <button id="dismissUpdateNotice" class="update-close" aria-label="Dismiss update notice">&times;</button>
+  </div>
   <p>
-    by
-    <a href="https://yagati.com/vasavya" target="_blank" rel="noopener noreferrer">
+    By
+    <a href="https://spoorthy.org/" target="_blank" rel="noopener noreferrer">
       Vasavya Yagati
     </a>
+    - page controls
   </p>
-  <p>Choose what myPC myRight should force on this page.</p>
 
   <div class="options">
     <div class="row">
-      <span class="label">Copy</span>
-      <div id="toggleCopy" class="toggle"><div class="toggle-handle"></div></div>
-    </div>
-    <div class="row">
-      <span class="label">Paste</span>
-      <div id="togglePaste" class="toggle"><div class="toggle-handle"></div></div>
-    </div>
-    <div class="row">
-      <span class="label">Selection</span>
-      <div id="toggleSelection" class="toggle"><div class="toggle-handle"></div></div>
+      <span class="label">Selection + Copy/Paste</span>
+      <div id="toggleSelCopyPaste" class="toggle"><div class="toggle-handle"></div></div>
     </div>
     <div class="row">
       <span class="label">Right click</span>

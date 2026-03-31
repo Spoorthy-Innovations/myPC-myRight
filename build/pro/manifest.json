@@ -1,12 +1,16 @@
 {
   "manifest_version": 3,
   "name": "myPC myRight Pro",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "Force copy, paste, selection, right-click, and unlock DevTools, print, scroll, video controls, overlays & more on any site.",
   "permissions": [
     "activeTab",
+    "tabs",
     "storage"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -23,6 +27,10 @@
       "128": "icons/icon128.png"
     },
     "default_title": "myPC myRight Pro - Take control of copy & paste"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "icons": {
     "16": "icons/icon16.png",
