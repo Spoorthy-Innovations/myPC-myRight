@@ -63,11 +63,11 @@ function saveAndSendProOptions(opts) {
 
 document.addEventListener('DOMContentLoaded', function () {
   const defaultProOptions = {
-    visibilityBypass: true,
-    keyboardUnblock: true,
-    overlayRemoval: true,
-    dragDropUnlock: true,
-    printUnlock: true,
+    visibilityBypass: false,
+    keyboardUnblock: false,
+    overlayRemoval: false,
+    dragDropUnlock: false,
+    printUnlock: false,
     scrollUnlock: false,
     videoUnlock: false,
     autocompleteUnlock: false,

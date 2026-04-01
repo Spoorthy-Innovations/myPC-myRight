@@ -112,38 +112,65 @@ function applyKeyboardUnblock(enabled) {
 
 
 // --- Feature 3: Overlay Removal ---
-// Removes invisible DIVs placed over text to stop you from clicking/selecting
+// Removes invisible DIVs placed over text to stop you from clicking/selecting.
+// Optimized: run on load + when DOM adds nodes (MutationObserver), not every 3s. Pre-filter to likely overlays and cap work.
 function applyOverlayRemoval(enabled) {
     if (!enabled) return;
 
+    var overlayDebounceTimer = null;
+    var OVERLAY_DEBOUNCE_MS = 500;
+    var MAX_OVERLAY_CHECKS = 150;
+
     function cleanOverlays() {
         if (!isGlobalEnabled()) return;
-        const elements = document.querySelectorAll('div, span');
-        elements.forEach(el => {
-            const style = window.getComputedStyle(el);
-            
-            // Check for typical transparent overlay patterns covering the screen/text
-            const isTransparent = style.opacity === '0' || style.backgroundColor === 'rgba(0, 0, 0, 0)' || style.background === 'transparent';
-            const isAbsoluteOrFixed = style.position === 'absolute' || style.position === 'fixed';
-            const isCovering = (parseInt(style.width) > window.innerWidth * 0.8) && (parseInt(style.height) > window.innerHeight * 0.8);
-            const highZIndex = parseInt(style.zIndex) > 100;
-            
+        // Only check elements that might be overlays (inline position/z-index) to avoid getComputedStyle on thousands
+        var candidates = document.querySelectorAll('div[style*="position"], div[style*="z-index"], span[style*="position"], span[style*="z-index"]');
+        var count = 0;
+        for (var i = 0; i < candidates.length && count < MAX_OVERLAY_CHECKS; i++) {
+            var el = candidates[i];
+            var style = window.getComputedStyle(el);
+            count++;
+            var isTransparent = style.opacity === '0' || style.backgroundColor === 'rgba(0, 0, 0, 0)' || style.background === 'transparent';
+            var isAbsoluteOrFixed = style.position === 'absolute' || style.position === 'fixed';
+            var isCovering = (parseInt(style.width, 10) > window.innerWidth * 0.8) && (parseInt(style.height, 10) > window.innerHeight * 0.8);
+            var highZIndex = parseInt(style.zIndex, 10) > 100;
             if (isAbsoluteOrFixed && highZIndex && isTransparent && isCovering) {
-                // Instead of deleting it (which might break React/Vue), drop it behind everything
                 el.style.setProperty('z-index', '-999999', 'important');
                 el.style.setProperty('pointer-events', 'none', 'important');
-            } else if (style.pointerEvents === 'none' && !isAbsoluteOrFixed) {
-                // Some sites set pointer-events: none on the TEXT itself so you can't click it
-                el.style.setProperty('pointer-events', 'auto', 'important');
             }
-        });
+        }
+        // Separate pass for pointer-events: none on text (fewer elements, no getComputedStyle)
+        var pointerCandidates = document.querySelectorAll('[style*="pointer-events"]');
+        for (var j = 0; j < pointerCandidates.length && j < 80; j++) {
+            var pel = pointerCandidates[j];
+            if (pel.tagName !== 'DIV' && pel.tagName !== 'SPAN') continue;
+            var pstyle = window.getComputedStyle(pel);
+            if (pstyle.pointerEvents === 'none' && pstyle.position !== 'absolute' && pstyle.position !== 'fixed') {
+                pel.style.setProperty('pointer-events', 'auto', 'important');
+            }
+        }
     }
 
-    // Run once
+    function scheduleOverlayClean() {
+        if (overlayDebounceTimer) clearTimeout(overlayDebounceTimer);
+        overlayDebounceTimer = setTimeout(function () {
+            overlayDebounceTimer = null;
+            if (isGlobalEnabled()) cleanOverlays();
+        }, OVERLAY_DEBOUNCE_MS);
+    }
+
     cleanOverlays();
-    
-    // And run periodically just in case
-    setInterval(cleanOverlays, 3000);
+    var overlayObserver = new MutationObserver(function (mutations) {
+        for (var m = 0; m < mutations.length; m++) {
+            if (mutations[m].addedNodes.length > 0) {
+                scheduleOverlayClean();
+                break;
+            }
+        }
+    });
+    if (document.body) {
+        overlayObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
 }
 
 
@@ -161,22 +188,20 @@ function applyDragDropUnlock(enabled) {
     window.addEventListener('dragstart', allowDrag, true);
     window.addEventListener('drop', allowDrag, true);
     
-    // Remove pointer-events: none from images
+    // Remove pointer-events: none from images (set always to avoid getComputedStyle on every img = less CPU)
     function cleanImages() {
         if (!isGlobalEnabled()) return;
-        const imgs = document.querySelectorAll('img');
-        imgs.forEach(img => {
+        var imgs = document.querySelectorAll('img');
+        for (var i = 0; i < imgs.length; i++) {
+            var img = imgs[i];
             img.removeAttribute('ondragstart');
-            if (window.getComputedStyle(img).pointerEvents === 'none') {
-                img.style.setProperty('pointer-events', 'auto', 'important');
-            }
-            // Some CSS tries to block dragging via user-drag
+            img.style.setProperty('pointer-events', 'auto', 'important');
             img.style.setProperty('-webkit-user-drag', 'auto', 'important');
-        });
+        }
     }
     
     cleanImages();
-    setInterval(cleanImages, 3000);
+    setInterval(cleanImages, 8000);
 }
 
 
@@ -235,7 +260,7 @@ function applyScrollUnlock(enabled) {
     }
 
     enforceScroll();
-    setInterval(enforceScroll, 2000);
+    setInterval(enforceScroll, 6000);
 }
 
 
@@ -257,7 +282,7 @@ function applyVideoUnlock(enabled) {
     }
 
     enforceVideoControls();
-    setInterval(enforceVideoControls, 3000);
+    setInterval(enforceVideoControls, 8000);
 }
 
 
@@ -284,7 +309,7 @@ function applyAutocompleteUnlock(enabled) {
     }
 
     enforceAutocomplete();
-    setInterval(enforceAutocomplete, 5000);
+    setInterval(enforceAutocomplete, 10000);
 }
 
 

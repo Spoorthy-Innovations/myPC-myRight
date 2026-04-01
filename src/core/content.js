@@ -1,7 +1,8 @@
 /**
- * Fpaste by Spoorthy - Force paste & copy on any website
- * Runs in capture phase so we get the event before the page can block it.
- * Can be configured per feature via popup (stored in chrome.storage).
+ * Fpaste by Spoorthy — force copy/paste (optional), selection, right-click, password visibility.
+ * Clipboard: window capture + stopImmediatePropagation helps bank/restricted sites; skipped on
+ * known rich editors (Google Docs/Sheets, Office Online) so their JS clipboard still works.
+ * User can turn Copy/Paste off in the popup. Options: chrome.storage.
  */
 
 var fpasteOptions = {
@@ -16,6 +17,52 @@ var fpasteSelectionStyleEl = null;
 var fpasteDomRelaxed = false;
 var fpasteRelaxIntervalId = null;
 var fpasteGlobalEnabled = true;
+var fpasteExcludedHostsDefault = [
+  'docs.google.com',
+  'drive.google.com',
+  'docs.microsoft.com',
+  '*.officeapps.live.com'
+];
+var fpasteExcludedHosts = fpasteExcludedHostsDefault.slice();
+var fpasteSiteExcluded = false;
+
+// Rich editors implement their own clipboard/selection; same interception that helps banks
+// would break them. Banks and typical restricted sites are not matched here.
+function fpasteIsRichEditorHost() {
+  return fpasteSiteExcluded;
+}
+
+function fpasteNormalizeHostPattern(pattern) {
+  if (!pattern) return '';
+  return String(pattern).trim().toLowerCase();
+}
+
+function fpasteMatchesHostPattern(hostname, pattern) {
+  if (!hostname || !pattern) return false;
+  if (pattern.indexOf('*.') === 0) {
+    var suffix = pattern.slice(2);
+    return hostname === suffix || hostname.endsWith('.' + suffix);
+  }
+  return hostname === pattern;
+}
+
+function fpasteComputeSiteExcluded() {
+  try {
+    var host = (location.hostname || '').toLowerCase();
+    for (var i = 0; i < fpasteExcludedHosts.length; i++) {
+      var p = fpasteNormalizeHostPattern(fpasteExcludedHosts[i]);
+      if (!p) continue;
+      if (fpasteMatchesHostPattern(host, p)) return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function fpasteForceClipboardEvents() {
+  return fpasteGlobalEnabled && !fpasteIsRichEditorHost();
+}
 
 function applySelectionStyle(enabled) {
   if (!enabled) {
@@ -24,6 +71,7 @@ function applySelectionStyle(enabled) {
     }
     return;
   }
+  if (fpasteIsRichEditorHost()) return;
   if (!fpasteSelectionStyleEl) {
     var style = document.createElement('style');
     style.id = 'fpaste-selection-style';
@@ -43,6 +91,7 @@ function applySelectionStyle(enabled) {
 }
 
 function relaxDOMForSelectionAndContext() {
+  if (fpasteIsRichEditorHost()) return;
   if (fpasteDomRelaxed) return;
   var body = document.body;
   if (!body) return;
@@ -84,18 +133,18 @@ function relaxDOMForSelectionAndContext() {
 
 function ensureRelaxTimer() {
   if (fpasteRelaxIntervalId) return;
-  // Periodically re-apply DOM relax in case the page mutates after load.
+  // Periodically re-apply DOM relax in case the page mutates after load. 10s to save CPU/battery.
   fpasteRelaxIntervalId = setInterval(function () {
     if (fpasteOptions.selection || fpasteOptions.rightClick) {
       applySelectionStyle(fpasteOptions.selection);
       fpasteDomRelaxed = false;
       relaxDOMForSelectionAndContext();
     }
-  }, 3000);
+  }, 10000);
 }
 
 function setFpasteEnabled(enabled) {
-  fpasteGlobalEnabled = !!enabled;
+  fpasteGlobalEnabled = !!enabled && !fpasteSiteExcluded;
   if (!fpasteGlobalEnabled) {
     applySelectionStyle(false);
     return;
@@ -128,9 +177,22 @@ function applyOptions(opts) {
 
 // Load current setting (default: all features ON)
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-  chrome.storage.sync.get({ fpasteOptions: null, fpasteEnabled: true }, function (data) {
+  chrome.storage.sync.get(
+    {
+      fpasteOptions: null,
+      fpasteEnabled: true,
+      fpasteExcludedHosts: fpasteExcludedHostsDefault
+    },
+    function (data) {
+      if (data && Array.isArray(data.fpasteExcludedHosts)) {
+        fpasteExcludedHosts = data.fpasteExcludedHosts.map(fpasteNormalizeHostPattern).filter(Boolean);
+      }
+      if (!fpasteExcludedHosts.length) {
+        fpasteExcludedHosts = fpasteExcludedHostsDefault.slice();
+      }
+      fpasteSiteExcluded = fpasteComputeSiteExcluded();
     if (data && typeof data.fpasteEnabled !== 'undefined') {
-      fpasteGlobalEnabled = !!data.fpasteEnabled;
+      fpasteGlobalEnabled = !!data.fpasteEnabled && !fpasteSiteExcluded;
     }
     if (data && data.fpasteOptions) {
       applyOptions(data.fpasteOptions);
@@ -138,8 +200,11 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
        // initialize properly
        setFpasteEnabled(fpasteGlobalEnabled);
     }
-  });
+    }
+  );
 } else {
+  fpasteExcludedHosts = fpasteExcludedHostsDefault.slice();
+  fpasteSiteExcluded = fpasteComputeSiteExcluded();
   setFpasteEnabled(true);
 }
 
@@ -166,29 +231,39 @@ window.addEventListener('load', function () {
 
 function setupMutationObserver() {
   if (!fpasteOptions.selection || !fpasteGlobalEnabled) return;
-  var observer = new MutationObserver(function(mutations) {
+  if (fpasteIsRichEditorHost()) return;
+  var relaxDebounceTimer = null;
+  var DEBOUNCE_MS = 120;
+
+  var scheduleRelax = function () {
+    if (relaxDebounceTimer) clearTimeout(relaxDebounceTimer);
+    relaxDebounceTimer = setTimeout(function () {
+      relaxDebounceTimer = null;
+      if (!fpasteOptions.selection || !fpasteGlobalEnabled) return;
+      fpasteDomRelaxed = false;
+      applySelectionStyle(fpasteOptions.selection);
+      relaxDOMForSelectionAndContext();
+    }, DEBOUNCE_MS);
+  };
+
+  var observer = new MutationObserver(function (mutations) {
     var needsRelax = false;
     for (var i = 0; i < mutations.length; i++) {
-        var mutation = mutations[i];
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            for (var j = 0; j < mutation.addedNodes.length; j++) {
-                if (mutation.addedNodes[j] !== fpasteSelectionStyleEl) {
-                    needsRelax = true;
-                    break;
-                }
-            }
-        } else if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-           needsRelax = true;
-           break;
+      var mutation = mutations[i];
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        for (var j = 0; j < mutation.addedNodes.length; j++) {
+          if (mutation.addedNodes[j] !== fpasteSelectionStyleEl) {
+            needsRelax = true;
+            break;
+          }
         }
+      } else if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+        needsRelax = true;
+        break;
+      }
+      if (needsRelax) break;
     }
-    
-    if (needsRelax) {
-        // Debounce the relax call slightly to avoid freezing the browser on heavy mutations
-        fpasteDomRelaxed = false;
-        applySelectionStyle(fpasteOptions.selection);
-        relaxDOMForSelectionAndContext();
-    }
+    if (needsRelax) scheduleRelax();
   });
 
   observer.observe(document.documentElement, {
@@ -199,103 +274,225 @@ function setupMutationObserver() {
   });
 }
 
-var allowPaste = function (e) {
-  if (!fpasteGlobalEnabled || !fpasteOptions.paste) {
-    return true;
+function fpasteForceSelectablePath(target) {
+  if (!target || !target.nodeType || target.nodeType !== 1) return;
+  var node = target;
+  var depth = 0;
+  while (node && depth < 24) {
+    if (node.style) {
+      node.style.setProperty('-webkit-user-select', 'text', 'important');
+      node.style.setProperty('-moz-user-select', 'text', 'important');
+      node.style.setProperty('-ms-user-select', 'text', 'important');
+      node.style.setProperty('user-select', 'text', 'important');
+      node.style.setProperty('pointer-events', 'auto', 'important');
+      node.style.setProperty('-webkit-touch-callout', 'default', 'important');
+    }
+    if (node.removeAttribute) {
+      node.removeAttribute('unselectable');
+      node.removeAttribute('onselectstart');
+      node.removeAttribute('oncontextmenu');
+      node.removeAttribute('onmousedown');
+      node.removeAttribute('onmouseup');
+      node.removeAttribute('onmousemove');
+    }
+    node = node.parentElement;
+    depth++;
   }
+}
+
+var allowPaste = function (e) {
+  if (!fpasteForceClipboardEvents() || !fpasteOptions.paste) return true;
   e.stopImmediatePropagation();
   return true;
 };
 
 var allowCopy = function (e) {
-  if (!fpasteGlobalEnabled || !fpasteOptions.copy) {
-    return true;
-  }
+  if (!fpasteForceClipboardEvents() || !fpasteOptions.copy) return true;
   e.stopImmediatePropagation();
   return true;
 };
 
 var allowCut = function (e) {
-  if (!fpasteGlobalEnabled || !fpasteOptions.copy) {
-    return true;
-  }
+  if (!fpasteForceClipboardEvents() || !fpasteOptions.copy) return true;
   e.stopImmediatePropagation();
   return true;
 };
 
-// Capture phase (true) = we run first, before the page's listeners
-// Attach to window so it runs before document listeners
 window.addEventListener('paste', allowPaste, true);
 window.addEventListener('copy', allowCopy, true);
 window.addEventListener('cut', allowCut, true);
 
-// Improve text selection: stop page handlers from blocking selection,
-// but do NOT interfere with click handlers on buttons/controls.
+// Improve text selection: re-relax DOM on select attempts (no stopPropagation — same issue
+// as clipboard for rich editors with custom selection).
 window.addEventListener(
   'selectstart',
   function (e) {
     if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
-    // On first real selection attempt, aggressively relax DOM again
-    // in case the page changed after initial load.
     relaxDOMForSelectionAndContext();
-    // Let selection proceed; just prevent page's own selectstart handlers
-    e.stopImmediatePropagation();
+    fpasteForceSelectablePath(e.target);
+    if (!fpasteIsRichEditorHost() && !fpasteIsInteractiveTarget(e.target)) {
+      // Many anti-copy sites cancel selection in selectstart handlers.
+      // Stop their handlers while preserving browser default selection behavior.
+      e.stopImmediatePropagation();
+    }
     return true;
   },
   true
 );
 
 // Some sites block selection via mousedown/mouseup handlers instead of selectstart.
-// We stop their handlers in capture phase, but try to avoid breaking real controls.
+// We stop their handlers in capture phase only when the click is in main content,
+// so we never break app chrome (Gmail right panel: Contacts, Calendar, Tasks, etc.).
 function fpasteIsInteractiveTarget(target) {
   if (!target || !target.closest) return false;
-  return !!target.closest(
-    'a, button, input, textarea, select, [contenteditable="true"], [role="button"], [role="link"]'
+  if (
+    target.closest(
+    'a, button, input, textarea, select, [contenteditable="true"], ' +
+    '[role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"], ' +
+    '[draggable="true"]'
+    )
+  ) {
+    return true;
+  }
+
+  // Many banking sites use custom dropdowns built with div/span + ARIA/state attrs.
+  var controlLike = target.closest(
+    '[role="combobox"], [role="listbox"], [role="menu"], [role="dialog"], ' +
+    '[aria-haspopup], [aria-expanded], [aria-controls], [data-toggle], [data-target]'
   );
+  if (controlLike) return true;
+
+  // Cursor:pointer is a strong signal for custom clickable controls.
+  var node = target;
+  var depth = 0;
+  while (node && depth < 6) {
+    if (node.nodeType === 1) {
+      try {
+        var style = window.getComputedStyle(node);
+        if (style && style.cursor === 'pointer') return true;
+      } catch (e) {}
+    }
+    node = node.parentElement;
+    depth++;
+  }
+  return false;
 }
 
-['mousedown', 'mouseup'].forEach(function (type) {
-  window.addEventListener(
-    type,
-    function (e) {
-      if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
-      if (fpasteIsInteractiveTarget(e.target)) return true;
-      // Allow default behavior (so clicks still work), but stop page handlers
-      // that try to cancel selection on regular text.
-      e.stopImmediatePropagation();
-      return true;
-    },
-    true
-  );
+// Only stop mousedown/mouseup when click is inside main content. Never stop in nav/sidebar/toolbar
+// (Gmail right panel and similar UIs use plain divs with JS handlers - not detectable by role).
+function fpasteIsMainContent(target) {
+  if (!target || !target.closest) return false;
+  if (target.closest('main, [role="main"], article')) return true;
+
+  // Some sites (including many news portals) do not use semantic main/article wrappers.
+  // In that case, allow body content but still avoid obvious app chrome regions.
+  if (!document.querySelector('main, [role="main"], article')) {
+    if (target.closest('header, nav, aside, footer, [role="navigation"], [role="banner"], [role="complementary"]')) {
+      return false;
+    }
+    return !!target.closest('body');
+  }
+
+  return false;
+}
+
+function fpasteAllowSelectionEvent(e) {
+  if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
+  if (fpasteIsInteractiveTarget(e.target)) return true;
+  fpasteForceSelectablePath(e.target);
+  // Allow browser default behavior, but block page handlers that cancel/clear selection.
+  e.stopImmediatePropagation();
+  return true;
+}
+
+[
+  'mousedown',
+  'mouseup',
+  'mousemove',
+  'pointerdown',
+  'pointerup',
+  'pointermove',
+  'touchstart',
+  'touchend',
+  'touchmove',
+  'dragstart'
+].forEach(function (type) {
+  window.addEventListener(type, fpasteAllowSelectionEvent, true);
 });
 
-// Force-enable right click (context menu)
-window.addEventListener(
-  'contextmenu',
+// Some sites clear selected text on selectionchange. Stop those handlers globally while
+// keeping browser-native selection behavior.
+document.addEventListener(
+  'selectionchange',
   function (e) {
-    if (!fpasteGlobalEnabled || !fpasteOptions.rightClick) return true;
-    // Stop page handlers from blocking the context menu, but don't prevent default
+    if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
     e.stopImmediatePropagation();
     return true;
   },
   true
 );
 
-function fpasteShowPassword(el) {
+// Force-enable right click: do not stopImmediatePropagation on window — that blocks the
+// event from reaching the focused element (e.g. Sheets cells). Rely on relaxDOM + styles.
+window.addEventListener(
+  'contextmenu',
+  function (e) {
+    if (!fpasteGlobalEnabled || !fpasteOptions.rightClick) return true;
+    relaxDOMForSelectionAndContext();
+    return true;
+  },
+  true
+);
+
+function fpasteShowPassword() {
   if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return;
-  if (!el || el.tagName !== 'INPUT') return;
-  var type = (el.getAttribute('type') || '').toLowerCase();
-  if (type !== 'password' && el.dataset.fpastePwd !== 'visible') return;
-  if (el.dataset.fpastePwd === 'visible') return;
-  el.setAttribute('type', 'text');
-  el.dataset.fpastePwd = 'visible';
+  var inputs = document.querySelectorAll('input');
+  inputs.forEach(function (el) {
+    if (!el || !el.value || el.dataset.fpastePwd === 'visible') return;
+    var type = (el.getAttribute('type') || '').toLowerCase();
+    var style = window.getComputedStyle(el);
+    var hasTextSecurity =
+      style.webkitTextSecurity && style.webkitTextSecurity !== 'none';
+    var isPasswordLike = type === 'password' || hasTextSecurity;
+    if (!isPasswordLike) return;
+
+    el.dataset.fpastePwd = 'visible';
+    el.dataset.fpasteOriginalType = type || '';
+    el.dataset.fpasteOriginalWebkitTextSecurity =
+      style.webkitTextSecurity || '';
+
+    if (type === 'password') {
+      el.setAttribute('type', 'text');
+    }
+    if (hasTextSecurity) {
+      el.style.setProperty('-webkit-text-security', 'none', 'important');
+    }
+  });
 }
 
-function fpasteHidePassword(el) {
-  if (!el || el.tagName !== 'INPUT') return;
-  if (el.dataset.fpastePwd !== 'visible') return;
-  el.setAttribute('type', 'password');
-  delete el.dataset.fpastePwd;
+function fpasteHidePassword() {
+  var inputs = document.querySelectorAll('input[data-fpaste-pwd="visible"]');
+  inputs.forEach(function (el) {
+    if (!el) return;
+    var origType = el.dataset.fpasteOriginalType || '';
+    var origWebkitTextSecurity =
+      el.dataset.fpasteOriginalWebkitTextSecurity || '';
+
+    if (origType === 'password') {
+      el.setAttribute('type', 'password');
+    }
+    if (origWebkitTextSecurity) {
+      el.style.setProperty(
+        '-webkit-text-security',
+        origWebkitTextSecurity,
+        'important'
+      );
+    }
+
+    delete el.dataset.fpastePwd;
+    delete el.dataset.fpasteOriginalType;
+    delete el.dataset.fpasteOriginalWebkitTextSecurity;
+  });
 }
 
 // Show password when hovering or editing, hide when leaving/blur

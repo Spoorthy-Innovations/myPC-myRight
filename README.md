@@ -67,8 +67,8 @@ Run:
 ```
 
 This generates versioned ZIPs in `build/`, e.g.:
-- `myPC-myRight-public-2.0.0.zip`
-- `myPC-myRight-pro-2.0.0.zip`
+- `myPC-myRight-public-2.1.zip`
+- `myPC-myRight-pro-2.1.zip`
 
 ## Screenshots
 
@@ -102,7 +102,12 @@ No external API calls are required for core functionality.
 
 ## Version History
 
-### 2.0.0 (current)
+### 2.1 (current)
+- Version bump to `2.1`
+- Maintenance update for exclusions UX and popup flow refinements
+- Ongoing compatibility fixes for restrictive websites
+
+### 2.0.0
 - Version bump to `2.0.0`
 - Combined `Selection + Copy/Paste` toggle
 - Added website exclusions options page

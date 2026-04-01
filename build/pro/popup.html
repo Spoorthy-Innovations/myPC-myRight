@@ -163,6 +163,23 @@
       font-size: 11px;
       color: #888;
     }
+    .quick-action {
+      margin: -6px 0 10px 0;
+    }
+    .quick-btn {
+      width: 100%;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      background: #fff;
+      color: #1f2328;
+      font-size: 12px;
+      padding: 7px 10px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .quick-btn:hover {
+      background: #f6f8fa;
+    }
     .store-update {
       display: none;
       font-size: 11px;
@@ -208,6 +225,9 @@
   <div class="version-row">
     <span class="version" id="appVersion" aria-label="Extension version"></span>
     <a href="#" id="openExclusions">Manage site exclusions</a>
+  </div>
+  <div class="quick-action">
+    <button id="addCurrentSiteToExclusions" class="quick-btn" type="button">Add this website to Excluding list</button>
   </div>
   <p class="store-update" id="storeUpdateVersion" aria-live="polite"></p>
   <div id="updateNotice" class="update-notice" role="status" aria-live="polite">

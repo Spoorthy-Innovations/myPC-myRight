@@ -13,10 +13,11 @@ function setFeatureTogglesEnabled(enabled) {
 }
 
 function readOptionsFromUI() {
+  var combined = document.getElementById('toggleSelCopyPaste')?.classList.contains('on');
   return {
-    copy: document.getElementById('toggleCopy')?.classList.contains('on'),
-    paste: document.getElementById('togglePaste')?.classList.contains('on'),
-    selection: document.getElementById('toggleSelection')?.classList.contains('on'),
+    copy: combined,
+    paste: combined,
+    selection: combined,
     rightClick: document.getElementById('toggleRightClick')?.classList.contains('on'),
     showPwd: document.getElementById('togglePwd')?.classList.contains('on'),
     strongSelection: document.getElementById('toggleStrongSelection')?.classList.contains('on'),
@@ -24,9 +25,8 @@ function readOptionsFromUI() {
 }
 
 function applyOptionsToUI(opts) {
-  setToggle(document.getElementById('toggleCopy'), opts.copy);
-  setToggle(document.getElementById('togglePaste'), opts.paste);
-  setToggle(document.getElementById('toggleSelection'), opts.selection);
+  var combinedOn = !!opts.copy && !!opts.paste && !!opts.selection;
+  setToggle(document.getElementById('toggleSelCopyPaste'), combinedOn);
   setToggle(document.getElementById('toggleRightClick'), opts.rightClick);
   setToggle(document.getElementById('togglePwd'), opts.showPwd);
   setToggle(document.getElementById('toggleStrongSelection'), opts.strongSelection);
@@ -57,7 +57,142 @@ function saveAndSendOptions(opts) {
   );
 }
 
+function clearUpdateBadge() {
+  if (!chrome || !chrome.action) return;
+  chrome.action.setBadgeText({ text: '' });
+}
+
+function markUpdateNoticeRead(currentVersion) {
+  if (!chrome || !chrome.storage || !chrome.storage.local) return;
+  chrome.storage.local.get({ fpasteUpdateNotice: null }, function (data) {
+    var notice = data.fpasteUpdateNotice;
+    if (!notice || notice.version !== currentVersion || !notice.unread) {
+      clearUpdateBadge();
+      return;
+    }
+    notice.unread = false;
+    chrome.storage.local.set({ fpasteUpdateNotice: notice }, function () {
+      clearUpdateBadge();
+    });
+  });
+}
+
+function initUpdateNotice(currentVersion) {
+  if (!chrome || !chrome.storage || !chrome.storage.local) return;
+  var box = document.getElementById('updateNotice');
+  var text = document.getElementById('updateNoticeText');
+  var dismiss = document.getElementById('dismissUpdateNotice');
+  if (!box || !text || !dismiss) return;
+
+  chrome.storage.local.get({ fpasteUpdateNotice: null }, function (data) {
+    var notice = data.fpasteUpdateNotice;
+    if (!notice || notice.version !== currentVersion || !notice.unread) {
+      clearUpdateBadge();
+      return;
+    }
+    text.textContent =
+      'Updated to v' +
+      notice.version +
+      (notice.previousVersion ? ' (from v' + notice.previousVersion + ')' : '');
+    box.classList.add('show');
+  });
+
+  dismiss.addEventListener('click', function () {
+    box.classList.remove('show');
+    markUpdateNoticeRead(currentVersion);
+  });
+}
+
+function initStoreUpdateVersion(currentVersion) {
+  if (!chrome || !chrome.runtime || typeof chrome.runtime.requestUpdateCheck !== 'function') return;
+  var el = document.getElementById('storeUpdateVersion');
+  if (!el) return;
+
+  try {
+    chrome.runtime.requestUpdateCheck(function (status, details) {
+      if (status !== 'update_available') return;
+      var nextVersion = details && details.version ? details.version : '';
+      if (!nextVersion || nextVersion === currentVersion) return;
+      el.textContent = 'New version available in Web Store: v' + nextVersion;
+      el.classList.add('show');
+    });
+  } catch (e) {}
+}
+
+function initAddCurrentSiteButton() {
+  var defaultExcludedHosts = [
+    'docs.google.com',
+    'drive.google.com',
+    'docs.microsoft.com',
+    '*.officeapps.live.com'
+  ];
+  var btn = document.getElementById('addCurrentSiteToExclusions');
+  var storeMsg = document.getElementById('storeUpdateVersion');
+  if (!btn || !chrome || !chrome.tabs || !chrome.storage || !chrome.storage.sync) return;
+
+  btn.addEventListener('click', function () {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      var url = tabs && tabs[0] ? tabs[0].url || '' : '';
+      var hostname = '';
+      try {
+        hostname = new URL(url).hostname.toLowerCase();
+      } catch (e) {
+        return;
+      }
+      if (!hostname) return;
+
+      chrome.storage.sync.get({ fpasteExcludedHosts: defaultExcludedHosts }, function (data) {
+        var base = Array.isArray(data.fpasteExcludedHosts) && data.fpasteExcludedHosts.length
+          ? data.fpasteExcludedHosts
+          : defaultExcludedHosts;
+        var list = base
+          .map(function (x) { return String(x || '').trim().toLowerCase(); })
+          .filter(Boolean);
+        if (list.indexOf(hostname) === -1) list.push(hostname);
+        list = Array.from(new Set(list));
+        chrome.storage.sync.set({ fpasteExcludedHosts: list }, function () {
+          if (storeMsg) {
+            storeMsg.textContent = 'Added to exclusions: ' + hostname + ' (reload tab)';
+            storeMsg.classList.add('show');
+          }
+        });
+      });
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+  var exclusionsLink = document.getElementById('openExclusions');
+  if (
+    exclusionsLink &&
+    typeof chrome !== 'undefined' &&
+    chrome.runtime &&
+    typeof chrome.runtime.openOptionsPage === 'function'
+  ) {
+    exclusionsLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      chrome.runtime.openOptionsPage();
+      window.close();
+    });
+  }
+
+  var verEl = document.getElementById('appVersion');
+  var currentVersion = '';
+  if (
+    verEl &&
+    typeof chrome !== 'undefined' &&
+    chrome.runtime &&
+    typeof chrome.runtime.getManifest === 'function'
+  ) {
+    try {
+      currentVersion = chrome.runtime.getManifest().version;
+      verEl.textContent = 'v' + currentVersion;
+    } catch (e) {}
+  }
+  if (currentVersion) initUpdateNotice(currentVersion);
+  if (currentVersion) initStoreUpdateVersion(currentVersion);
+  initAddCurrentSiteButton();
+
   const defaultOptions = {
     copy: true,
     paste: true,
@@ -113,9 +248,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  attachToggle('toggleCopy');
-  attachToggle('togglePaste');
-  attachToggle('toggleSelection');
+  attachToggle('toggleSelCopyPaste');
   attachToggle('toggleRightClick');
   attachToggle('togglePwd');
   attachToggle('toggleStrongSelection');

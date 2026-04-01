@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "myPC myRight Pro",
-  "version": "2.0.0",
+  "version": "2.1",
   "description": "Force copy, paste, selection, right-click, and unlock DevTools, print, scroll, video controls, overlays & more on any site.",
   "permissions": [
     "activeTab",
