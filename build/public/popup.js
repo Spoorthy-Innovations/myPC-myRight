@@ -34,9 +34,13 @@ function applyOptionsToUI(opts) {
 
 function saveAndSendOptions(opts) {
   if (!chrome || !chrome.storage || !chrome.tabs) return;
-  chrome.storage.sync.set(
+  chrome.storage.local.set(
     { fpasteOptions: opts },
     function () {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        console.error('myPC myRight: failed to save options:', chrome.runtime.lastError.message);
+        return;
+      }
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (tabs && tabs[0]) {
           chrome.tabs.sendMessage(
@@ -128,7 +132,7 @@ function initAddCurrentSiteButton() {
   ];
   var btn = document.getElementById('addCurrentSiteToExclusions');
   var storeMsg = document.getElementById('storeUpdateVersion');
-  if (!btn || !chrome || !chrome.tabs || !chrome.storage || !chrome.storage.sync) return;
+  if (!btn || !chrome || !chrome.tabs || !chrome.storage || !chrome.storage.local) return;
 
   btn.addEventListener('click', function () {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -141,7 +145,7 @@ function initAddCurrentSiteButton() {
       }
       if (!hostname) return;
 
-      chrome.storage.sync.get({ fpasteExcludedHosts: defaultExcludedHosts }, function (data) {
+      chrome.storage.local.get({ fpasteExcludedHosts: defaultExcludedHosts }, function (data) {
         var base = Array.isArray(data.fpasteExcludedHosts) && data.fpasteExcludedHosts.length
           ? data.fpasteExcludedHosts
           : defaultExcludedHosts;
@@ -150,7 +154,7 @@ function initAddCurrentSiteButton() {
           .filter(Boolean);
         if (list.indexOf(hostname) === -1) list.push(hostname);
         list = Array.from(new Set(list));
-        chrome.storage.sync.set({ fpasteExcludedHosts: list }, function () {
+        chrome.storage.local.set({ fpasteExcludedHosts: list }, function () {
           if (storeMsg) {
             storeMsg.textContent = 'Added to exclusions: ' + hostname + ' (reload tab)';
             storeMsg.classList.add('show');
@@ -208,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  chrome.storage.sync.get({ fpasteOptions: null, fpasteEnabled: true }, function (data) {
+  chrome.storage.local.get({ fpasteOptions: null, fpasteEnabled: true }, function (data) {
     let opts = data.fpasteOptions;
     if (!opts) {
       const en = !!data.fpasteEnabled;
@@ -260,7 +264,11 @@ document.addEventListener('DOMContentLoaded', function () {
       setToggle(masterToggle, isNowOn);
       setFeatureTogglesEnabled(isNowOn);
       if (!chrome || !chrome.storage || !chrome.tabs) return;
-      chrome.storage.sync.set({ fpasteEnabled: isNowOn }, function () {
+      chrome.storage.local.set({ fpasteEnabled: isNowOn }, function () {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          console.error('myPC myRight: failed to save master toggle:', chrome.runtime.lastError.message);
+          return;
+        }
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
           if (tabs && tabs[0]) {
             chrome.tabs.sendMessage(

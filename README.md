@@ -68,7 +68,7 @@ Run:
 
 This generates versioned ZIPs in `build/`, e.g.:
 - `myPC-myRight-public-2.1.zip`
-- `myPC-myRight-pro-2.1.zip`
+- `myPC-myRight-pro-2.2.zip`
 
 ## Screenshots
 
@@ -102,7 +102,14 @@ No external API calls are required for core functionality.
 
 ## Version History
 
-### 2.1 (current)
+### 2.2 (Pro, current)
+- Version bump to `2.2` (Pro only; Public remains on `2.1`)
+- Fixed right-click being blocked on sites that suppress it via mousedown/mouseup instead of the `contextmenu` event
+- Reduced false "dangerous extension" flags on banking sites by making Pro's Advanced features (e.g. Visibility Bypass) respect the site exclusions list
+- Fixed forced text selection/copy not working on sites with large clickable-looking text containers
+- Fixed toggles/settings not saving reliably when Chrome Sync is disabled; settings now persist in local storage with automatic one-time migration from older installs
+
+### 2.1 (Public, current)
 - Version bump to `2.1`
 - Maintenance update for exclusions UX and popup flow refinements
 - Ongoing compatibility fixes for restrictive websites

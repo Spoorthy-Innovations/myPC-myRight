@@ -1,7 +1,7 @@
 Write-Host "Starting build process..."
 
-# Build Public (Free) Version
-Write-Host "Building Public (Free) version..."
+# Build Public Version
+Write-Host "Building Public version..."
 New-Item -ItemType Directory -Force -Path ".\build\public" | Out-Null
 Copy-Item -Path ".\src\core\*" -Destination ".\build\public\" -Recurse -Force
 if (Test-Path ".\src\public\*") {
@@ -18,10 +18,11 @@ if (Test-Path ".\src\pro\*") {
 
 Write-Host "Creating ZIP packages..."
 
+$version = (Get-Content -Raw package.json | ConvertFrom-Json).version
 $publicSource = ".\build\public"
-$publicZip    = ".\build\myPC-myRight-public.zip"
+$publicZip    = ".\build\myPC-myRight-public-$version.zip"
 $proSource    = ".\build\pro"
-$proZip       = ".\build\myPC-myRight-pro.zip"
+$proZip       = ".\build\myPC-myRight-pro-$version.zip"
 
 if (Test-Path $publicZip) {
     Remove-Item $publicZip -Force
@@ -32,7 +33,7 @@ if (Test-Path $proZip) {
 
 if (Test-Path $publicSource) {
     Compress-Archive -Path "$publicSource\*" -DestinationPath $publicZip
-    Write-Host "Public (Free) ZIP created at $publicZip"
+    Write-Host "Public ZIP created at $publicZip"
 } else {
     Write-Warning "Public build folder not found: $publicSource"
 }

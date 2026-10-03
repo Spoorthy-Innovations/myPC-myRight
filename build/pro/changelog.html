@@ -45,10 +45,10 @@
     <h2 class="ver" id="changelogVersion">Version</h2>
     <p id="changelogMeta" class="muted" style="margin: -2px 0 10px 0;"></p>
     <ul>
-      <li>Improved compatibility for restrictive sites while preserving key UI controls.</li>
-      <li>Added quick popup action: "Add this website to Excluding list".</li>
-      <li>Exclusions now append safely without replacing existing/default entries.</li>
-      <li>Popup layout refinements, including one-line version and exclusions access.</li>
+      <li>Fixed right-click sometimes staying blocked on sites that suppress it via mousedown/mouseup instead of the context menu event.</li>
+      <li>Reduced false "dangerous extension" warnings on banking sites: Advanced features (like Visibility Bypass) now respect your site exclusions list.</li>
+      <li>Fixed forced text selection/copy not working on some sites that use clickable-looking text containers.</li>
+      <li>Fixed toggles and settings not saving reliably on machines with Chrome Sync disabled - settings now save locally and migrate automatically.</li>
     </ul>
   </section>
 

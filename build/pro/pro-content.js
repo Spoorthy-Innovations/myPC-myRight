@@ -19,9 +19,45 @@ var fpasteProOptions = {
 var proObserver = null;
 var fpasteGlobalEnabled = true;
 
+// Sites the user has excluded (e.g. their bank) - mirrors content.js's own exclusion list.
+// Several Pro features (notably the visibilityState/hidden override below) are exactly the
+// kind of DOM tampering that bank/fraud-detection scripts scan for and flag as a "dangerous
+// extension". Respecting the exclusion list here lets users opt their bank's domain out.
+var fpasteProExcludedHostsDefault = [
+    'docs.google.com',
+    'drive.google.com',
+    'docs.microsoft.com',
+    '*.officeapps.live.com'
+];
+var fpasteSiteExcluded = false;
+
+function fpasteProNormalizeHostPattern(pattern) {
+    return pattern ? String(pattern).trim().toLowerCase() : '';
+}
+
+function fpasteProMatchesHostPattern(hostname, pattern) {
+    if (!hostname || !pattern) return false;
+    if (pattern.indexOf('*.') === 0) {
+        var suffix = pattern.slice(2);
+        return hostname === suffix || hostname.endsWith('.' + suffix);
+    }
+    return hostname === pattern;
+}
+
+function fpasteProComputeSiteExcluded(hosts) {
+    try {
+        var host = (location.hostname || '').toLowerCase();
+        for (var i = 0; i < hosts.length; i++) {
+            var p = fpasteProNormalizeHostPattern(hosts[i]);
+            if (p && fpasteProMatchesHostPattern(host, p)) return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
 // Helper to check if extension is globally enabled
 function isGlobalEnabled() {
-    return fpasteGlobalEnabled;
+    return fpasteGlobalEnabled && !fpasteSiteExcluded;
 }
 
 // --- Feature 1: Visibility Bypass ---
@@ -374,6 +410,7 @@ applyZapperUnlock(true);
 // --- Initialization & Listener ---
 
 function applyAllProFeatures(opts) {
+    if (fpasteSiteExcluded) return;
     if (opts.visibilityBypass) applyVisibilityBypass(true);
     if (opts.keyboardUnblock) applyKeyboardUnblock(true);
     if (opts.overlayRemoval) applyOverlayRemoval(true);
@@ -387,16 +424,23 @@ function applyAllProFeatures(opts) {
 }
 
 // Load current settings from storage
-if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get({ fpasteProOptions: null, fpasteEnabled: true }, function (data) {
-        if (data && typeof data.fpasteEnabled !== 'undefined') {
-            fpasteGlobalEnabled = !!data.fpasteEnabled;
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(
+        { fpasteProOptions: null, fpasteEnabled: true, fpasteExcludedHosts: fpasteProExcludedHostsDefault },
+        function (data) {
+            if (data && typeof data.fpasteEnabled !== 'undefined') {
+                fpasteGlobalEnabled = !!data.fpasteEnabled;
+            }
+            var hosts = (data && Array.isArray(data.fpasteExcludedHosts) && data.fpasteExcludedHosts.length)
+                ? data.fpasteExcludedHosts
+                : fpasteProExcludedHostsDefault;
+            fpasteSiteExcluded = fpasteProComputeSiteExcluded(hosts);
+            if (data && data.fpasteProOptions) {
+                fpasteProOptions = data.fpasteProOptions;
+            }
+            applyAllProFeatures(fpasteProOptions);
         }
-        if (data && data.fpasteProOptions) {
-            fpasteProOptions = data.fpasteProOptions;
-        }
-        applyAllProFeatures(fpasteProOptions);
-    });
+    );
 } else {
     // Default to true if storage is unavailable
     applyAllProFeatures(fpasteProOptions);

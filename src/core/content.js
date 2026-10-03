@@ -107,11 +107,13 @@ function relaxDOMForSelectionAndContext() {
   } catch (e) {}
 
   try {
-    var nodes = document.querySelectorAll('[unselectable],[onselectstart],[oncontextmenu]');
+    var nodes = document.querySelectorAll('[unselectable],[onselectstart],[oncontextmenu],[onmousedown],[onmouseup]');
     nodes.forEach(function (el) {
       el.removeAttribute('unselectable');
       el.removeAttribute('onselectstart');
       el.removeAttribute('oncontextmenu');
+      el.removeAttribute('onmousedown');
+      el.removeAttribute('onmouseup');
       if (fpasteOptions.selection && el.style) {
         if (fpasteOptions.strongSelection) {
           el.style.setProperty('-webkit-user-select', 'text', 'important');
@@ -176,8 +178,8 @@ function applyOptions(opts) {
 }
 
 // Load current setting (default: all features ON)
-if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-  chrome.storage.sync.get(
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+  chrome.storage.local.get(
     {
       fpasteOptions: null,
       fpasteEnabled: true,
@@ -362,10 +364,12 @@ function fpasteIsInteractiveTarget(target) {
   );
   if (controlLike) return true;
 
-  // Cursor:pointer is a strong signal for custom clickable controls.
+  // Cursor:pointer is a signal for custom clickable controls. Kept shallow (target + 1
+  // ancestor) so large text wrappers that merely sit inside a clickable region (common on
+  // anti-copy sites) don't get treated as "interactive" and skip force-selection entirely.
   var node = target;
   var depth = 0;
-  while (node && depth < 6) {
+  while (node && depth < 2) {
     if (node.nodeType === 1) {
       try {
         var style = window.getComputedStyle(node);
@@ -397,10 +401,19 @@ function fpasteIsMainContent(target) {
 }
 
 function fpasteAllowSelectionEvent(e) {
-  if (!fpasteGlobalEnabled || !fpasteOptions.selection) return true;
-  if (fpasteIsInteractiveTarget(e.target)) return true;
-  fpasteForceSelectablePath(e.target);
-  // Allow browser default behavior, but block page handlers that cancel/clear selection.
+  if (!fpasteGlobalEnabled) return true;
+  var isRightButton = e.button === 2 || e.which === 3;
+  var selectionActive = !!fpasteOptions.selection;
+  // Some restricted sites block the context menu via mousedown/mouseup (checking for the
+  // right button) instead of a 'contextmenu' handler. Unblock that path whenever rightClick
+  // is on, even if selection forcing is off, and even on targets that look "interactive"
+  // (the whole point is restoring the native menu everywhere).
+  var rightClickActive = !!fpasteOptions.rightClick && isRightButton;
+  if (!selectionActive && !rightClickActive) return true;
+  if (!rightClickActive && fpasteIsInteractiveTarget(e.target)) return true;
+  if (selectionActive) fpasteForceSelectablePath(e.target);
+  // Allow browser default behavior, but block page handlers that cancel/clear selection
+  // or preventDefault() a right-button mousedown/mouseup to suppress the context menu.
   e.stopImmediatePropagation();
   return true;
 }
@@ -439,6 +452,8 @@ window.addEventListener(
   function (e) {
     if (!fpasteGlobalEnabled || !fpasteOptions.rightClick) return true;
     relaxDOMForSelectionAndContext();
+    // Block site handlers that cancel the native context menu.
+    e.stopImmediatePropagation();
     return true;
   },
   true
@@ -448,12 +463,17 @@ function fpasteShowPassword() {
   if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return;
   var inputs = document.querySelectorAll('input');
   inputs.forEach(function (el) {
-    if (!el || !el.value || el.dataset.fpastePwd === 'visible') return;
+    if (!el || el.dataset.fpastePwd === 'visible') return;
     var type = (el.getAttribute('type') || '').toLowerCase();
     var style = window.getComputedStyle(el);
     var hasTextSecurity =
       style.webkitTextSecurity && style.webkitTextSecurity !== 'none';
-    var isPasswordLike = type === 'password' || hasTextSecurity;
+    var ac = (el.getAttribute('autocomplete') || '').toLowerCase();
+    var isPasswordLike =
+      type === 'password' ||
+      hasTextSecurity ||
+      ac.indexOf('password') !== -1 ||
+      el.classList.contains('password');
     if (!isPasswordLike) return;
 
     el.dataset.fpastePwd = 'visible';
@@ -468,6 +488,99 @@ function fpasteShowPassword() {
       el.style.setProperty('-webkit-text-security', 'none', 'important');
     }
   });
+}
+
+var fpastePwdForceTimer = null;
+var fpasteActivePwdEl = null;
+
+function fpasteIsPasswordLikeInput(el) {
+  if (!el || el.tagName !== 'INPUT') return false;
+  var type = (el.getAttribute('type') || '').toLowerCase();
+  var ac = (el.getAttribute('autocomplete') || '').toLowerCase();
+  var hint = (
+    (el.name || '') +
+    ' ' +
+    (el.id || '') +
+    ' ' +
+    (el.placeholder || '') +
+    ' ' +
+    (el.className || '')
+  ).toLowerCase();
+  if (type === 'password') return true;
+  if (ac.indexOf('password') !== -1) return true;
+  if (hint.indexOf('password') !== -1 || hint.indexOf('passwd') !== -1 || hint.indexOf('pwd') !== -1) return true;
+  if (hint.indexOf('mpin') !== -1 || hint.indexOf('pin') !== -1) return true;
+  return false;
+}
+
+function fpasteForceRevealActivePassword() {
+  if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return;
+  var targets = [];
+  if (fpasteActivePwdEl && document.contains(fpasteActivePwdEl)) {
+    targets.push(fpasteActivePwdEl);
+  }
+  var ae = document.activeElement;
+  if (ae && ae.tagName === 'INPUT') {
+    targets.push(ae);
+  }
+  var extra = document.querySelectorAll(
+    'input[type=\"password\"], input[autocomplete*=\"password\" i], input[name*=\"pass\" i], input[id*=\"pass\" i], ' +
+    'input[placeholder*=\"pass\" i], input[name*=\"pin\" i], input[id*=\"pin\" i], input[placeholder*=\"pin\" i]'
+  );
+  for (var i = 0; i < extra.length && i < 10; i++) targets.push(extra[i]);
+
+  var seen = new Set();
+  targets.forEach(function (el) {
+    if (!el || seen.has(el)) return;
+    seen.add(el);
+    if (!fpasteIsPasswordLikeInput(el)) return;
+    try {
+      if (el.dataset.fpastePwd !== 'visible') {
+        var currentType = (el.getAttribute('type') || '').toLowerCase();
+        var style = window.getComputedStyle(el);
+        el.dataset.fpastePwd = 'visible';
+        el.dataset.fpasteOriginalType = currentType || '';
+        el.dataset.fpasteOriginalWebkitTextSecurity =
+          (style && style.webkitTextSecurity) ? style.webkitTextSecurity : '';
+      }
+      var type = (el.getAttribute('type') || '').toLowerCase();
+      if (type === 'password') el.setAttribute('type', 'text');
+      el.style.setProperty('-webkit-text-security', 'none', 'important');
+    } catch (e) {}
+  });
+}
+
+function fpasteStartPasswordForce(el) {
+  if (!fpasteIsPasswordLikeInput(el)) return;
+  fpasteActivePwdEl = el;
+  fpasteForceRevealActivePassword();
+  if (fpastePwdForceTimer) clearInterval(fpastePwdForceTimer);
+  fpastePwdForceTimer = setInterval(fpasteForceRevealActivePassword, 120);
+}
+
+function fpasteStopPasswordForce(el) {
+  if (fpasteActivePwdEl && el && fpasteActivePwdEl !== el) return;
+  fpasteActivePwdEl = null;
+  if (fpastePwdForceTimer) {
+    clearInterval(fpastePwdForceTimer);
+    fpastePwdForceTimer = null;
+  }
+}
+
+function fpasteRevealInputIfSelectedAll(el) {
+  if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return;
+  if (!fpasteIsPasswordLikeInput(el)) return;
+  try {
+    var valueLen = (el.value || '').length;
+    if (!valueLen) return;
+    var ss = typeof el.selectionStart === 'number' ? el.selectionStart : -1;
+    var se = typeof el.selectionEnd === 'number' ? el.selectionEnd : -1;
+    // Alternative trigger: reveal only when user selected full field text.
+    if (ss === 0 && se === valueLen) {
+      fpasteStartPasswordForce(el);
+      fpasteForceRevealActivePassword();
+    }
+  } catch (e) {}
 }
 
 function fpasteHidePassword() {
@@ -500,6 +613,8 @@ document.addEventListener(
   'mouseover',
   function (e) {
     if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
+    var t = e.target && e.target.closest ? e.target.closest('input') : null;
+    if (t) fpasteStartPasswordForce(t);
     fpasteShowPassword(e.target);
     return true;
   },
@@ -510,6 +625,8 @@ document.addEventListener(
   'focus',
   function (e) {
     if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
+    var t = e.target && e.target.closest ? e.target.closest('input') : null;
+    if (t) fpasteStartPasswordForce(t);
     fpasteShowPassword(e.target);
     return true;
   },
@@ -520,6 +637,8 @@ document.addEventListener(
   'mouseout',
   function (e) {
     if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
+    var t = e.target && e.target.closest ? e.target.closest('input') : null;
+    if (t) fpasteStopPasswordForce(t);
     fpasteHidePassword(e.target);
     return true;
   },
@@ -530,11 +649,29 @@ document.addEventListener(
   'blur',
   function (e) {
     if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
+    var t = e.target && e.target.closest ? e.target.closest('input') : null;
+    if (t) fpasteStopPasswordForce(t);
     fpasteHidePassword(e.target);
     return true;
   },
   true
 );
+
+// Alternative reveal flow for stubborn sites:
+// if user selects all characters in a password-like field, reveal that field.
+['select', 'keyup', 'mouseup'].forEach(function (evt) {
+  document.addEventListener(
+    evt,
+    function (e) {
+      if (!fpasteGlobalEnabled || !fpasteOptions.showPwd) return true;
+      var t = e.target && e.target.closest ? e.target.closest('input') : null;
+      if (!t) return true;
+      fpasteRevealInputIfSelectedAll(t);
+      return true;
+    },
+    true
+  );
+});
 
 // Listen for enable/disable toggle from the popup
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
@@ -543,14 +680,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
     if (message.type === 'fpaste:setEnabled') {
       setFpasteEnabled(message.enabled);
-      if (chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({ fpasteEnabled: !!message.enabled });
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ fpasteEnabled: !!message.enabled });
       }
       sendResponse({ ok: true });
     } else if (message.type === 'fpaste:setOptions' && message.options) {
       applyOptions(message.options);
-      if (chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({
           fpasteOptions: fpasteOptions
         });
       }

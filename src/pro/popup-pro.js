@@ -36,11 +36,15 @@ function applyProOptionsToUI(opts) {
 
 function saveAndSendProOptions(opts) {
   if (!chrome || !chrome.storage || !chrome.tabs) return;
-  chrome.storage.sync.set(
+  chrome.storage.local.set(
     {
       fpasteProOptions: opts
     },
     function () {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        console.error('myPC myRight: failed to save pro options:', chrome.runtime.lastError.message);
+        return;
+      }
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (tabs && tabs[0]) {
           chrome.tabs.sendMessage(
@@ -81,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // Load Pro options
-  chrome.storage.sync.get({ fpasteProOptions: null }, function (data) {
+  chrome.storage.local.get({ fpasteProOptions: null }, function (data) {
     let opts = data.fpasteProOptions;
     if (!opts) {
       opts = defaultProOptions;

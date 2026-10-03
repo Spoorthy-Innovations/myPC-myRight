@@ -31,9 +31,9 @@ function setStatus(msg) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-  if (!chrome || !chrome.storage || !chrome.storage.sync) return;
+  if (!chrome || !chrome.storage || !chrome.storage.local) return;
 
-  chrome.storage.sync.get(
+  chrome.storage.local.get(
     { fpasteExcludedHosts: FPASTE_EXCLUDED_HOSTS_DEFAULT },
     function (data) {
       var patterns = Array.isArray(data.fpasteExcludedHosts)
@@ -48,7 +48,11 @@ document.addEventListener('DOMContentLoaded', function () {
   if (saveBtn) {
     saveBtn.addEventListener('click', function () {
       var patterns = readTextareaLines();
-      chrome.storage.sync.set({ fpasteExcludedHosts: patterns }, function () {
+      chrome.storage.local.set({ fpasteExcludedHosts: patterns }, function () {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          setStatus('Could not save: ' + chrome.runtime.lastError.message);
+          return;
+        }
         setStatus('Saved. Reload affected tabs.');
       });
     });

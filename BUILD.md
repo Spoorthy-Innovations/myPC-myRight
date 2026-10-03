@@ -14,7 +14,7 @@ From the repo root:
 
 **Output:**
 
-- `build\public\` — Public (Free) extension, ready for Load unpacked or distribution
+- `build\public\` — Public extension, ready for Load unpacked or distribution
 - `build\pro\` — Pro extension, ready for Load unpacked or distribution
 - `build\myPC-myRight-public.zip` — ZIP for Public
 - `build\myPC-myRight-pro.zip` — ZIP for Pro

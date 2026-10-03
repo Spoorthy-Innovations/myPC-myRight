@@ -28,8 +28,8 @@ function copyDir(src, dest) {
 // Ensure the build directory exists
 fs.mkdirSync('./build', { recursive: true });
 
-// Build Public (Free) Version
-console.log('Building Public (Free) version...');
+// Build Public Version
+console.log('Building Public version...');
 fs.mkdirSync('./build/public/icons', { recursive: true });
 copyDir('./src/core', './build/public');
 copyDir('./src/public', './build/public');
@@ -41,5 +41,5 @@ copyDir('./src/core', './build/pro');
 copyDir('./src/pro', './build/pro');
 
 console.log('Build complete!');
-console.log('Public (Free) version located at: ./build/public');
+console.log('Public version located at: ./build/public');
 console.log('Pro version located at: ./build/pro');
