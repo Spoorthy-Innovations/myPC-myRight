@@ -67,8 +67,8 @@ Run:
 ```
 
 This generates versioned ZIPs in `build/`, e.g.:
-- `myPC-myRight-public-2.1.zip`
-- `myPC-myRight-pro-2.2.zip`
+- `myPC-myRight-public-2.3.zip`
+- `myPC-myRight-pro-2.3.zip`
 
 ## Screenshots
 
@@ -102,14 +102,22 @@ No external API calls are required for core functionality.
 
 ## Version History
 
-### 2.2 (Pro, current)
+### 2.3 (Pro and Public, current)
+- Version bump to `2.3` for both editions (Public moves from `2.1` and includes the 2.2 fixes)
+- Fixed Website Exclusions being ignored in Pro: excluded sites (including the default `docs.google.com`) are now fully untouched
+- Exclusions accept full URLs and paths, e.g. `https://docs.google.com/` or `www.google.com/maps` to exclude only that section
+- Fixed Google Sheets cell selection and Google Docs click/drag
+- Fixed Google Maps dragging/panning, and drag on canvas apps, sliders and video players
+- Build: release ZIPs now use forward-slash paths so icons load correctly on the Chrome Web Store
+
+### 2.2 (Pro)
 - Version bump to `2.2` (Pro only; Public remains on `2.1`)
 - Fixed right-click being blocked on sites that suppress it via mousedown/mouseup instead of the `contextmenu` event
 - Reduced false "dangerous extension" flags on banking sites by making Pro's Advanced features (e.g. Visibility Bypass) respect the site exclusions list
 - Fixed forced text selection/copy not working on sites with large clickable-looking text containers
 - Fixed toggles/settings not saving reliably when Chrome Sync is disabled; settings now persist in local storage with automatic one-time migration from older installs
 
-### 2.1 (Public, current)
+### 2.1 (Public)
 - Version bump to `2.1`
 - Maintenance update for exclusions UX and popup flow refinements
 - Ongoing compatibility fixes for restrictive websites
