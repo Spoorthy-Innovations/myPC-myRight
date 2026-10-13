@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 2.3 (Pro and Public) - 2026-10-14
+
+### Fixed
+- Pro: site exclusions were ignored because `pro-content.js` redeclared `fpasteGlobalEnabled` / `fpasteSiteExcluded` in the shared content-script scope and re-enabled core features on excluded sites. Pro now uses its own variables.
+- Exclusion patterns now accept a scheme and/or path (`https://docs.google.com/`, `www.google.com/maps`); previously anything other than a bare host never matched.
+- Google Sheets cell selection, Google Docs clicks and Google Maps panning: mouse/pointer interception is skipped on `*.google.com`, and on `canvas`, `video`, `[role="application"]`, `[role="slider"]`, `[role="scrollbar"]` and `[aria-roledescription="map"]` targets on every site.
+
+### Changed
+- Public edition jumps from `2.1` to `2.3` and picks up the 2.2 core fixes (right-click via mousedown, selection in pointer containers, local storage settings).
+
 ## 2.2 (Pro) - 2026-10-04
 
 ### Fixed

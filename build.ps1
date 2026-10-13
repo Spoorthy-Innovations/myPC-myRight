@@ -18,6 +18,23 @@ if (Test-Path ".\src\pro\*") {
 
 Write-Host "Creating ZIP packages..."
 
+# Compress-Archive on Windows PowerShell 5.1 writes "icons\icon16.png" entry names; the Chrome
+# Web Store needs forward slashes or manifest paths like "icons/icon16.png" won't resolve.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+function New-ExtensionZip($sourceDir, $zipPath) {
+    $root = (Resolve-Path $sourceDir).Path.TrimEnd('\')
+    $zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        Get-ChildItem -Path $root -Recurse -File | ForEach-Object {
+            $entryName = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
+    } finally {
+        $zip.Dispose()
+    }
+}
+
 $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
 $publicSource = ".\build\public"
 $publicZip    = ".\build\myPC-myRight-public-$version.zip"
@@ -32,14 +49,14 @@ if (Test-Path $proZip) {
 }
 
 if (Test-Path $publicSource) {
-    Compress-Archive -Path "$publicSource\*" -DestinationPath $publicZip
+    New-ExtensionZip $publicSource (Join-Path (Get-Location) $publicZip)
     Write-Host "Public ZIP created at $publicZip"
 } else {
     Write-Warning "Public build folder not found: $publicSource"
 }
 
 if (Test-Path $proSource) {
-    Compress-Archive -Path "$proSource\*" -DestinationPath $proZip
+    New-ExtensionZip $proSource (Join-Path (Get-Location) $proZip)
     Write-Host "Pro ZIP created at $proZip"
 } else {
     Write-Warning "Pro build folder not found: $proSource"

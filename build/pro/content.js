@@ -37,22 +37,37 @@ function fpasteNormalizeHostPattern(pattern) {
   return String(pattern).trim().toLowerCase();
 }
 
-function fpasteMatchesHostPattern(hostname, pattern) {
+// Pattern forms: "host", "*.host", optionally with scheme and/or path prefix
+// (e.g. "https://www.google.com/maps/" matches every page under /maps).
+function fpasteMatchesHostPattern(hostname, pathname, pattern) {
   if (!hostname || !pattern) return false;
-  if (pattern.indexOf('*.') === 0) {
-    var suffix = pattern.slice(2);
-    return hostname === suffix || hostname.endsWith('.' + suffix);
+  pattern = pattern.replace(/^[a-z]+:\/\//, '');
+  var slash = pattern.indexOf('/');
+  var hostPart = slash === -1 ? pattern : pattern.slice(0, slash);
+  var pathPart = slash === -1 ? '' : pattern.slice(slash).replace(/\/+$/, '');
+  hostPart = hostPart.replace(/:\d+$/, '');
+
+  var hostOk;
+  if (hostPart.indexOf('*.') === 0) {
+    var suffix = hostPart.slice(2);
+    hostOk = hostname === suffix || hostname.endsWith('.' + suffix);
+  } else {
+    hostOk = hostname === hostPart;
   }
-  return hostname === pattern;
+  if (!hostOk) return false;
+  if (!pathPart) return true;
+  var path = (pathname || '/').toLowerCase();
+  return path === pathPart || path.indexOf(pathPart + '/') === 0;
 }
 
 function fpasteComputeSiteExcluded() {
   try {
     var host = (location.hostname || '').toLowerCase();
+    var path = location.pathname || '/';
     for (var i = 0; i < fpasteExcludedHosts.length; i++) {
       var p = fpasteNormalizeHostPattern(fpasteExcludedHosts[i]);
       if (!p) continue;
-      if (fpasteMatchesHostPattern(host, p)) return true;
+      if (fpasteMatchesHostPattern(host, path, p)) return true;
     }
     return false;
   } catch (e) {
@@ -357,6 +372,16 @@ function fpasteIsInteractiveTarget(target) {
     return true;
   }
 
+  // Drag/pan surfaces (Google Maps, canvas drawing apps, sliders) need raw pointer events.
+  if (
+    target.closest(
+      'canvas, video, [role="application"], [role="slider"], [role="scrollbar"], ' +
+      '[aria-roledescription="map"]'
+    )
+  ) {
+    return true;
+  }
+
   // Many banking sites use custom dropdowns built with div/span + ARIA/state attrs.
   var controlLike = target.closest(
     '[role="combobox"], [role="listbox"], [role="menu"], [role="dialog"], ' +
@@ -400,8 +425,21 @@ function fpasteIsMainContent(target) {
   return false;
 }
 
+// Web apps that drive their UI from raw mouse/pointer events on plain divs (Sheets grid, Docs,
+// Maps). They don't block selection this way, so intercepting only breaks clicks and drags.
+var fpastePointerSafeHosts = ['*.google.com'];
+var fpastePointerSafeHost = (function () {
+  try {
+    var host = (location.hostname || '').toLowerCase();
+    for (var i = 0; i < fpastePointerSafeHosts.length; i++) {
+      if (fpasteMatchesHostPattern(host, '/', fpastePointerSafeHosts[i])) return true;
+    }
+  } catch (e) {}
+  return false;
+})();
+
 function fpasteAllowSelectionEvent(e) {
-  if (!fpasteGlobalEnabled) return true;
+  if (!fpasteGlobalEnabled || fpastePointerSafeHost) return true;
   var isRightButton = e.button === 2 || e.which === 3;
   var selectionActive = !!fpasteOptions.selection;
   // Some restricted sites block the context menu via mousedown/mouseup (checking for the

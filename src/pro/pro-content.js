@@ -17,7 +17,8 @@ var fpasteProOptions = {
 };
 
 var proObserver = null;
-var fpasteGlobalEnabled = true;
+// Distinct names: content.js shares this global scope and owns fpasteGlobalEnabled / fpasteSiteExcluded.
+var fpasteProGlobalEnabled = true;
 
 // Sites the user has excluded (e.g. their bank) - mirrors content.js's own exclusion list.
 // Several Pro features (notably the visibilityState/hidden override below) are exactly the
@@ -29,27 +30,41 @@ var fpasteProExcludedHostsDefault = [
     'docs.microsoft.com',
     '*.officeapps.live.com'
 ];
-var fpasteSiteExcluded = false;
+var fpasteProSiteExcluded = false;
 
 function fpasteProNormalizeHostPattern(pattern) {
     return pattern ? String(pattern).trim().toLowerCase() : '';
 }
 
-function fpasteProMatchesHostPattern(hostname, pattern) {
+// Pattern forms: "host", "*.host", optionally with scheme and/or path prefix.
+function fpasteProMatchesHostPattern(hostname, pathname, pattern) {
     if (!hostname || !pattern) return false;
-    if (pattern.indexOf('*.') === 0) {
-        var suffix = pattern.slice(2);
-        return hostname === suffix || hostname.endsWith('.' + suffix);
+    pattern = pattern.replace(/^[a-z]+:\/\//, '');
+    var slash = pattern.indexOf('/');
+    var hostPart = slash === -1 ? pattern : pattern.slice(0, slash);
+    var pathPart = slash === -1 ? '' : pattern.slice(slash).replace(/\/+$/, '');
+    hostPart = hostPart.replace(/:\d+$/, '');
+
+    var hostOk;
+    if (hostPart.indexOf('*.') === 0) {
+        var suffix = hostPart.slice(2);
+        hostOk = hostname === suffix || hostname.endsWith('.' + suffix);
+    } else {
+        hostOk = hostname === hostPart;
     }
-    return hostname === pattern;
+    if (!hostOk) return false;
+    if (!pathPart) return true;
+    var path = (pathname || '/').toLowerCase();
+    return path === pathPart || path.indexOf(pathPart + '/') === 0;
 }
 
 function fpasteProComputeSiteExcluded(hosts) {
     try {
         var host = (location.hostname || '').toLowerCase();
+        var path = location.pathname || '/';
         for (var i = 0; i < hosts.length; i++) {
             var p = fpasteProNormalizeHostPattern(hosts[i]);
-            if (p && fpasteProMatchesHostPattern(host, p)) return true;
+            if (p && fpasteProMatchesHostPattern(host, path, p)) return true;
         }
     } catch (e) {}
     return false;
@@ -57,7 +72,7 @@ function fpasteProComputeSiteExcluded(hosts) {
 
 // Helper to check if extension is globally enabled
 function isGlobalEnabled() {
-    return fpasteGlobalEnabled && !fpasteSiteExcluded;
+    return fpasteProGlobalEnabled && !fpasteProSiteExcluded;
 }
 
 // --- Feature 1: Visibility Bypass ---
@@ -410,7 +425,7 @@ applyZapperUnlock(true);
 // --- Initialization & Listener ---
 
 function applyAllProFeatures(opts) {
-    if (fpasteSiteExcluded) return;
+    if (fpasteProSiteExcluded) return;
     if (opts.visibilityBypass) applyVisibilityBypass(true);
     if (opts.keyboardUnblock) applyKeyboardUnblock(true);
     if (opts.overlayRemoval) applyOverlayRemoval(true);
@@ -429,12 +444,12 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
         { fpasteProOptions: null, fpasteEnabled: true, fpasteExcludedHosts: fpasteProExcludedHostsDefault },
         function (data) {
             if (data && typeof data.fpasteEnabled !== 'undefined') {
-                fpasteGlobalEnabled = !!data.fpasteEnabled;
+                fpasteProGlobalEnabled = !!data.fpasteEnabled;
             }
             var hosts = (data && Array.isArray(data.fpasteExcludedHosts) && data.fpasteExcludedHosts.length)
                 ? data.fpasteExcludedHosts
                 : fpasteProExcludedHostsDefault;
-            fpasteSiteExcluded = fpasteProComputeSiteExcluded(hosts);
+            fpasteProSiteExcluded = fpasteProComputeSiteExcluded(hosts);
             if (data && data.fpasteProOptions) {
                 fpasteProOptions = data.fpasteProOptions;
             }
@@ -452,8 +467,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         if (!message) return;
 
         if (message.type === 'fpaste:setEnabled') {
-            fpasteGlobalEnabled = !!message.enabled;
-            if (fpasteGlobalEnabled) {
+            fpasteProGlobalEnabled = !!message.enabled;
+            if (fpasteProGlobalEnabled) {
                 // re-apply
                 applyAllProFeatures(fpasteProOptions);
             } else {
